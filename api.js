@@ -36,6 +36,7 @@ app.use("/api/v1/plan" , planRouter);
 
 
 
+const port = process.env.PORT || 3000;
 // localhost:3000 -> express API
 app.listen(3000 ,function() {
     console.log("server started at port 3000");
