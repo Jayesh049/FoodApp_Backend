@@ -1,12 +1,12 @@
 //tech knowledge
 //! ( schema )-> set  of features and rules a certain entity should follow
 
-let secrets = require("../secrets");
+// let secrets = require("../secrets");
 
 //* how to create a db -> link share
 //* connect to my app //mongoose
 const mongoose = require('mongoose');//npm i mongoose
-let dblink = 'mongodb+srv://Joksepha:t87v5oMdd82SxiBH@cluster0.b0d2mtt.mongodb.net/?retryWrites=true&w=majority';
+let DB_LINK = process.env.DB_LINK || require("../secrets").DB_LINK;
 
 mongoose
 .connect(dblink).then(function (){

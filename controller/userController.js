@@ -1,4 +1,4 @@
-const secrets = require("../secrets");
+const secrets = process.env || require("../secrets");
 const jwt = require("jsonwebtoken");
 const FooduserModel = require("../model/userModule");
 
