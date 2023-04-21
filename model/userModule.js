@@ -9,7 +9,7 @@ const mongoose = require('mongoose');//npm i mongoose
 let DB_LINK = process.env.DB_LINK || require("../secrets").DB_LINK;
 
 mongoose
-.connect(dblink).then(function (){
+.connect(DB_LINK).then(function (){
     console.log("connected");
 }).catch(function (err){
     console.log("error" , err);
