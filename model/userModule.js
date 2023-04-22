@@ -6,10 +6,10 @@
 //* how to create a db -> link share
 //* connect to my app //mongoose
 const mongoose = require('mongoose');//npm i mongoose
-let DB_LINK = process.env.DB_LINK || require("../secrets").DB_LINK;
+let secrets = require("../secrets");
 
 mongoose
-.connect(DB_LINK).then(function (){
+.connect(secrets.DB_LINK).then(function (){
     console.log("connected");
 }).catch(function (err){
     console.log("error" , err);
