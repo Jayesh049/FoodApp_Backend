@@ -1,5 +1,5 @@
 const nodemailer = require("nodemailer");
-const secrets = process.env || require("../secrets");
+const secrets = process.env.secrets || require("../secrets");
 async function mailSender(email , token) {
     {/*input through which mechanism send your email -> port ,facilitator (technical details)
     ye nodemailer ke website se copy paste maar lo
