@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const secrets = require("../secrets");
+const secrets = process.env || require("../secrets");
 //aap jiss schema se kaam kar rahe ho usse import karna na bhule
 const FooduserModel = require("../model/userModule");
 const mailSender = require("../utilities/mailSender");
