@@ -37,9 +37,9 @@ app.use("/api/v1/review", reviewRouter);
 
 
 
-const port = process.env.PORT || 3000;
+
 // localhost:3000 -> express API
-app.listen(port ,function() {
+app.listen(process.env.PORT || 3000 ,function() {
     console.log("server started at port 3000");
 })
 

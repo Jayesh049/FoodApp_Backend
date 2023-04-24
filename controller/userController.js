@@ -1,5 +1,4 @@
-const secrets = process.env.secrets || require("../secrets");
-const jwt = require("jsonwebtoken");
+
 const FooduserModel = require("../model/userModule");
 
 async function getAllUsersController(req , res){
