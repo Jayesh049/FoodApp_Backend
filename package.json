@@ -4,7 +4,7 @@
   "main": "api.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "api.js"
+    "start": "nodemon api.js"
   },
   "keywords": [],
   "author": "",

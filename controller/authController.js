@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const JWTSECRET = process.env.JWTSECRET || require("../secrets").JWTSECRET;
+
 //aap jiss schema se kaam kar rahe ho usse import karna na bhule
 const FooduserModel = require("../model/userModule");
 const mailSender = require("../utilities/mailSender");
@@ -52,7 +53,8 @@ async function loginController(req , res){
           //* defining token
           const token = jwt.sign({
             data: user["_id"],
-            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)},secrets.JWTSECRET);
+            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
+          } , JWTSECRET);
           //put token into cookies
           res.cookie("JWT" , token);
             //send the token
@@ -210,7 +212,7 @@ function protectRoute(req , res , next){
         console.log("protect Route Encountered");
         //you are logged in then it will allow next fn to run
         //allow next fn to run
-        let token = jwt.verify(JWT , secrets.JWTSECRET);
+        let token = jwt.verify(jwt , JWTSECRET);
         console.log("JWT DECRYPTED" ,token);
         //humne userId nikalwa liya tokenki data me se
         let userId = token.data;
