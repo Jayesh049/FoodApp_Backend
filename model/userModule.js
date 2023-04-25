@@ -6,7 +6,7 @@
 //* how to create a db -> link share
 //* connect to my app //mongoose
 const mongoose = require('mongoose');//npm i mongoose
-let secrets = require("../secrets");
+// let secrets = require("../secrets");
 let DB_LINK = process.env.DB_LINK || require("../secrets").DB_LINK;
 
 mongoose
