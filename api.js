@@ -35,9 +35,9 @@ app.use("/api/v1/review", reviewRouter);
 
 
 
-app.use(function(req ,res){
-  res.send("<h1>Backend  API</h1>");
-})
+// app.use(function(req ,res){
+//   res.send("<h1>Backend  API</h1>");
+// })
 
 
 // localhost:3000 -> express API
