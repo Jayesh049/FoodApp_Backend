@@ -3,7 +3,7 @@ const app = express();
 //token name is -> JWT & mechanism -> cookies
 //represent -> collection
 const cookieParser = require('cookie-parser');
-const cors = require("cors");
+
 //jsonwebtoken
 // const jwt = require("jsonwebtoken");//npm install jswonwebtoken
 // const secrets = require("./secrets");
@@ -13,18 +13,8 @@ const userRouter = require("./routes/userRoutes");
 const authRouter = require("./routes/authRoutes");
 const planRouter = require("./routes/planRoutes");
 const reviewRouter = require("./routes/reviewRoutes");
-// const bookingRouter = require("./routes/bookingRoutes")
 
-const rateLimit = require('express-rate-limit')
 
-const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-})
-// Apply the rate limiting middleware to API calls only
-app.use(cors());
 
 //to add post body data to req.body
 app.use(express.json());//getting users body data
@@ -42,7 +32,6 @@ app.use("/api/v1/auth" , authRouter);
 app.use("/api/v1/user" , userRouter);
 app.use("/api/v1/plan" , planRouter);
 app.use("/api/v1/review", reviewRouter);
-// app.use("/api/v1/booking", bookingRouter)
 
 
 
@@ -50,7 +39,7 @@ app.use("/api/v1/review", reviewRouter);
 //   res.send("<h1>Backend  API</h1>");
 // })
 
-app.use('/api', apiLimiter);
+
 // localhost:3000 -> express API
 app.listen(process.env.PORT || 3000 ,function() {
     console.log("server started at port 3000");
