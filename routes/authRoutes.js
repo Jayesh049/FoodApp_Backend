@@ -1,6 +1,5 @@
 const express = require('express');
 const authRouter = express.Router();
-const FooduserModel = require("../model/userModule");
 const { signupController , loginController,
     resetPasswordController , forgetPasswordController} = require("../controller/authController");
     

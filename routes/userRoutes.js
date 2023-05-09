@@ -9,6 +9,6 @@ userRouter.get("/" , protectRoute, getAllUsersController);
 //agar protectroute fn ke hum req res ko change kar rahe hai
 //then iss user function ke andar bhi hum changes kar rahe h
 //logged in user //profile controller
-userRouter.get('/profile', protectRoute , profileController);
+userRouter.get("/profile", protectRoute , profileController);
 
 module.exports = userRouter;
