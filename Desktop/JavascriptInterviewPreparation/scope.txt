@@ -1,0 +1,2 @@
+jaha par initialised value padi hui hai wo uske bahar dekhta hai
+agr code ke andar initialised nahi hai toh wo uske bahar dekhta hai 	
