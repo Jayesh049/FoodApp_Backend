@@ -29,7 +29,7 @@
 ## Testing : Postman
 ## Frontend : React, Backend : Express
 ## Deployment : 
-    * Backend :Heroku 
+    * Backend : cyclic 
     * Frontend : Netlify
     * Codebase : Github
     * Database server : MongoDB Atlas 
