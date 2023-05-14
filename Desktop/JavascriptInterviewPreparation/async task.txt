@@ -1,5 +1,0 @@
-1>all the function runinside the call stack (javascript)
-2>jo bhi async function hai usko htaa kar node API me utha diya jaega same in browser api
-3>jab async function ka kaam hoga toh node api se hataa kar ke callback queue me daal diya jaega 
-4>callback queue and callback stack ke beech me guard baitha hoga which is our event loop , jaise hi call stack me jagah khaali bachti hai
-toh event loop usse callback queue se utha kar callstack me daal dega 

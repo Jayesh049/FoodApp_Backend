@@ -22,6 +22,8 @@ app.use(express.json());//getting users body data
 app.use(cookieParser());
 //database ki jitni bhi call hoti hai wo async hoti h
 
+//apply the rate limiting middleware to API Calls only
+// app.use(cors());
 
 // //authRouter for authorization controller functions like signup , login ,forgetPassword , resetPassword
 // const authRouter = express.Router();

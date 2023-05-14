@@ -1,2 +1,0 @@
-kahi saare update aate ho aur orders kayi saare aaye products ke 
-then we use nosql
