@@ -77,6 +77,10 @@ let userSchema = new mongoose.Schema({
   },
   address:{
     type:String,
+  },
+  bookings : {
+    type : [mongoose.Schema.ObjectId],
+    ref:  "FoodbookingModel"
   }
 
 })

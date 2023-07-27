@@ -13,7 +13,7 @@ const userRouter = require("./routes/userRoutes");
 const authRouter = require("./routes/authRoutes");
 const planRouter = require("./routes/planRoutes");
 const reviewRouter = require("./routes/reviewRoutes");
-
+const bookingRouter = require("./routes/bookingRoutes");
 // to  add post body data to req.body
 const rateLimit = require('express-rate-limit')
 
@@ -46,7 +46,7 @@ app.use("/api/v1/auth" , authRouter);
 app.use("/api/v1/user" , userRouter);
 app.use("/api/v1/plan" , planRouter);
 app.use("/api/v1/review", reviewRouter);
-
+app.use("/api/v1/booking" , bookingRouter);
 
 
 // app.use(function(req ,res){
@@ -61,21 +61,6 @@ app.listen(process.env.PORT || 3000 ,function() {
 
 
 
-/*
-
-{
-  name: 'Jasbir',
-  password: 'abcd',
-  confirmPassword: 'abcd',
-  email: 'abc@gmail.com',
-  phonenumber: '9560884197',
-  pic: 'dp.png',
-  !unique id mongodb provide karta hai
-  _id: new ObjectId("6433bc951a0750cce4beb9ee"),
-  !mongoose
-  __v: 0
-}
-*/ 
 
 
 

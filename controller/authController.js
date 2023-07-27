@@ -1,3 +1,9 @@
+// jwt.sign(jwtValue.toString())
+// jwt.sign(jwtValue.toString(), jwtSecret, { expiresIn: '1800s' });
+
+
+
+
 const jwt = require("jsonwebtoken");
 const JWTSECRET = process.env.JWTSECRET || require("../secrets").JWTSECRET;
 
@@ -30,7 +36,7 @@ async function signupController(req , res){
 }
   
 //login input:email + password  
-async function loginController(req , res){
+async function  loginController(req , res){
     try{
     let data = req.body;
     let {email , password} = data;
@@ -211,8 +217,9 @@ function protectRoute(req , res , next){
       if(cookies.JWT){
         console.log("protect Route Encountered");
         //you are logged in then it will allow next fn to run
-        //allow next fn to run
-        let token = jwt.verify(jwt , JWTSECRET);
+        //# changes done by me
+        //allow next fn to run I have stringify the jwt object for using token in protect route
+        let token = jwt.sign(JSON.stringify(jwt), JWTSECRET);
         console.log("JWT DECRYPTED" ,token);
         //humne userId nikalwa liya tokenki data me se
         let userId = token.data;
