@@ -56,24 +56,16 @@ async function initiateBooking(req, res) {
         })
     }
 }
+
 async function verifyPayment(req, res) {
     // JWT 
     const secret = KEY_SECRET;
-    console.log(req.body);
-    // const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-    // req.body;
-
-    // const body = razorpay_order_id + "|" + razorpay_payment_id;
-
+    // console.log(req.body);
     // 
     const shasum = crypto.createHmac("sha256", secret);
-    console.log(shasum);
     shasum.update(JSON.stringify(req.body));
-
     const digest = shasum.digest("hex");
-
     console.log(digest, req.headers["x-razorpay-signature"]);
-
     if (digest === req.headers["x-razorpay-signature"]) {
     //   payment is done 
         console.log("request is legit");
@@ -84,6 +76,35 @@ async function verifyPayment(req, res) {
         res.status(403).json({ message: "Invalid" });
     }
 };
+// async function verifyPayment(req, res) {
+//     // JWT 
+//     const secret = KEY_SECRET;
+//     const {order_id, payment_id} = req.body;
+//     const razorpay_signature = req.headers['x-razorpay-signature'];
+//     console.log(req.body);
+//     /**************************************************************/ 
+
+//     const shasum = crypto.createHmac("sha256", secret);
+    
+//     shasum.update(order_id +"|" + payment_id);
+    
+//     const generated_signature = shasum.digest("hex");
+    
+//     console.log(generated_signature , razorpay_signature)
+//     if(razorpay_signature == generated_signature){
+//         console.log("request is legit");
+//         res.status(200).json({
+//             message: "Payment Verified",
+//         });
+//     }
+//     else{
+//         res.status(403).json({ message: "Invalid" });
+//     }
+
+    
+    
+   
+// };
 
 async function getBookingById(req, res) {
     try {
