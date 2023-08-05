@@ -49,9 +49,26 @@ async function createReviewController(req, res){
         res.status(500).json({message : err.message});
     }
   }
+
+  async function getTop3Reviews(req, res) {
+    try {
+        let reviews = await reviewModel.find()
+            // multiple different entries from diff models 
+            .populate({ path: "user", select: "name pic " })
+            .populate({ path: "plan", select: "price name" }).limit(3);
+        res.status(200).json({
+            reviews,
+            result: "all results send"
+        })
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({ message: err.message });
+    }
+}
   
   
   module.exports = { 
         createReviewController,
-        getAllReviewController
+        getAllReviewController,
+        getTop3Reviews
   }

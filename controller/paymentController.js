@@ -28,37 +28,36 @@ const razorpay = new Razorpay({
 };
 
  async function paymentVerification (req, res) {
-  // const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-  //   req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =   req.body;
+  console.log(req.body);
+  const body = razorpay_order_id + "|" + razorpay_payment_id;
 
-  // const body = razorpay_order_id + "|" + razorpay_payment_id;
+  const expectedSignature = crypto
+    .createHmac("sha256", KEY_SECRET)
+    .update(body.toString())
+    .digest("hex");
 
-  // const expectedSignature = crypto
-  //   .createHmac("sha256", KEY_SECRET)
-  //   .update(body.toString())
-  //   .digest("hex");
+  const isAuthentic = expectedSignature === razorpay_signature;
 
-  // const isAuthentic = expectedSignature === razorpay_signature;
-
-  // if (isAuthentic) {
+  if (isAuthentic) {
     // Database comes here
 
-    // await Payment.create({
-    //   razorpay_order_id,
-    //   razorpay_payment_id,
-    //   razorpay_signature,
-    // });
+    await Payment.create({
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    });
       res.status(200).json({
         success: true,
       })
-    // res.redirect(
-    //   `http://localhost:3000/paymentsuccess?reference=${razorpay_payment_id}`
-    // );
-  // } else {
-  //   res.status(400).json({
-  //     success: false,
-  //   });
-  // }
+    res.redirect(
+      `http://localhost:3000/paymentsuccess?reference=${razorpay_payment_id}`
+    );
+  } else {
+    res.status(400).json({
+      success: false,
+    });
+  }
 };
 
 module.exports = {

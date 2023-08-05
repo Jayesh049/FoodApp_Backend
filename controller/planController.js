@@ -107,11 +107,28 @@ async function getPlanController(req, res){
     }
 }
 
+async function getbestPlans(req, res) {
+    try {
+        let plans = await FoodplanModel.find().sort("-averageRating").limit(3);
+        // plans = plans.slice(0, 3);
+        res.status(200).json({
+            plans
+        })
+    } catch (err) {
+        console.log(err);
+        res.status(200).json({
+            message: err.message
+        })
+    }
+
+}
+
 module.exports = {
 
         getAllplansController,  
         createPlanController,
         updatePlanController,
         deletePlanController,
-        getPlanController
+        getPlanController,
+        getbestPlans
 }

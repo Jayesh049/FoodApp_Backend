@@ -4,7 +4,8 @@ const { getAllplansController,
     createPlanController,
     updatePlanController,
     deletePlanController,
-    getPlanController
+    getPlanController,
+    getbestPlans
 } =
     require('../controller/planController');
 // plans -> get all the plans from db -> sensitive route -> protected route -> logged in i will only allow that person
@@ -12,6 +13,8 @@ const { getAllplansController,
 planRouter.route("/")
     .get(getAllplansController)
     .post(createPlanController)
+
+    planRouter.get("/sortByRating",getbestPlans)
 
 //ye humein id ke through mil jaegi
 planRouter.route("/:planRoutes")
