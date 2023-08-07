@@ -26,7 +26,11 @@ const reviewSchema = new mongoose.Schema({
      required : [true , "Review must belong to a plan "],
      ref:"FoodplanModel"
     }
+
+
+    
 })
+
 
 const ReviewModel = mongoose.model("FoodreviewModel" , reviewSchema);
 module.exports = ReviewModel;
