@@ -19,18 +19,22 @@ async function initiateBooking(req, res) {
         // 1. add a booking to booking model
         let booking = await FoodBookingModel.create(req.body);
         let bookingId = booking["_id"];
+        console.log(bookingId);
+        // let stringgifybookingId = bookingId.toString();
+        console.log(bookingId);
         // 2.add uid of that booing to userModel
         let userId = req.body.user;
+        console.log(userId);
         let user = await UserModel.findById(userId);
         console.log(user);
-        var order = new Object() , stack =[];
-        for(var i = 0 ; i< user.length ;i++){
-            parseInt(order[i].bookings.push(bookingId));
-        }
-        // user.bookings.push(bookingId);
+        // var order = new Object() , stack =[];
+        // for(var i = 0 ; i< user.length ;i++){
+        //     parseInt(order[i].bookings.push(bookingId));
+        // }
+        user.bookings.push(bookingId);
         await user.save();
         // 3. razorpay -> order create send 
-        const amount = req.body.priceAtThatTime;
+        const amount = req.body.priceAtThatTime*100;
         const currency = "INR";
         const options = {
             amount,
@@ -46,6 +50,8 @@ async function initiateBooking(req, res) {
             amount: response.amount,
             booking: booking,
             message: "booking created",
+            entity:response.id,
+            response
         });
     }
     catch (err) {
@@ -57,74 +63,55 @@ async function initiateBooking(req, res) {
     }
 }
 
+
 async function verifyPayment(req, res) {
     // JWT 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-    req.body;
+    const secret = KEY_SECRET;
+    try {
+        // getting the details back from our font-end
+        const {
+            orderCreationId,
+            razorpayPaymentId,
+            razorpayOrderId,
+            razorpaySignature,
+        } = req.body;
 
-  const body = razorpay_order_id + "|" + razorpay_payment_id;
+        // Creating our own digest
+        // The format should be like this:
+        // digest = hmac_sha256(orderCreationId + "|" + razorpayPaymentId, secret);
+        const shasum = crypto.createHmac("sha256", secret);
 
-  const expectedSignature = crypto
-    .createHmac("sha256", KEY_SECRET)
-    .update(body.toString())
-    .digest("hex");
+        shasum.update(`${orderCreationId}|${razorpayPaymentId}`);
 
-  const isAuthentic = expectedSignature === razorpay_signature;
+        const digest = shasum.digest("hex");
 
-  if (isAuthentic) {
-    // Database comes here
+        // comaparing our digest with the actual signature
+        if (digest !== razorpaySignature)
+            return res.status(400).json({ msg: "Transaction not legit!" });
 
-    await Payment.create({
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    });
-      res.status(200).json({
-        success: true,
-      })
-    res.redirect(
-      `http://localhost:3000/paymentsuccess?reference=${razorpay_payment_id}`
-    );
-  } else {
-    res.status(400).json({
-      success: false,
-    });
-  }
+        // THE PAYMENT IS LEGIT & VERIFIED
+        // YOU CAN SAVE THE DETAILS IN YOUR DATABASE IF YOU WANT
+
+        res.json({
+            msg: "success",
+            orderId: razorpayOrderId,
+            paymentId: razorpayPaymentId,
+        });
+    } catch (error) {
+        res.status(500).send(error);
+    }
 };
-// async function verifyPayment(req, res) {
-//     // JWT 
-//     const secret = KEY_SECRET;
-//     const {order_id, payment_id} = req.body;
-//     const razorpay_signature = req.headers['x-razorpay-signature'];
-//     console.log(req.body);
-//     /**************************************************************/ 
 
-//     const shasum = crypto.createHmac("sha256", secret);
-    
-//     shasum.update(order_id +"|" + payment_id);
-    
-//     const generated_signature = shasum.digest("hex");
-    
-//     console.log(generated_signature , razorpay_signature)
-//     if(razorpay_signature == generated_signature){
-//         console.log("request is legit");
-//         res.status(200).json({
-//             message: "Payment Verified",
-//         });
-//     }
-//     else{
-//         res.status(403).json({ message: "Invalid" });
-//     }
 
-    
-    
-   
-// };
 
 async function getBookingById(req, res) {
     try {
-        let id = req.params.bookingId;
-        let booking = await FoodBookingModel.findById(id);
+      let bookings = await FoodBookingModel.find();
+
+      console.log(bookings);
+        let id = req.params.bookings;
+        console.log(id);
+        let booking = await FoodBookingModel.findById(bookings);
         res.status(200).json({
             result: "booking found",
             booking: booking
@@ -147,6 +134,10 @@ async function getBookings(req, res) {
         res.end(err.message);
     }
 }
+
+// jo abhi booking kari hai sirf wo show karni hai uske liye alag controller bnana hoga 
+
+
 module.exports = {
     initiateBooking,
     verifyPayment,

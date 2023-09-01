@@ -51,9 +51,9 @@ app.use("/api/v1/review", reviewRouter);
 app.use("/api/v1/booking" , bookingRouter);
 app.use("/api/v1/payment" , paymentRouter);
 
-// app.use(function(req ,res){
-//   res.send("<h1>Backend  API</h1>");
-// })
+  // app.use(function(req ,res){
+  //   res.send("<h1>Backend  API</h1>");
+  // })
 
 app.get("/api/getkey", (req, res) =>
   res.status(200).json({ key: KEY_ID })

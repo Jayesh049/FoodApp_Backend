@@ -15,8 +15,9 @@ const razorpay = new Razorpay({
 });
 
  async function checkout(req, res) {
+  const { rate } = req.body;
   const options = {
-    amount: 50000,
+    amount: rate,
     currency: "INR",
   };
   const order = await razorpay.orders.create(options);
