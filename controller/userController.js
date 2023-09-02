@@ -1,5 +1,6 @@
 
 const FooduserModel = require("../model/userModule");
+
 async function profileController(req , res){
   //user ki profile show ho
   try{

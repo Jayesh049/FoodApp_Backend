@@ -1,19 +1,26 @@
 const mongoose = require("mongoose");
 
 const paymentSchema = new mongoose.Schema({
-  razorpay_order_id: {
+  
+            razorpayOrderId: {
     type: String,
     required: true,
   },
-  razorpay_payment_id: {
+  razorpayPaymentId: {
     type: String,
     required: true,
   },
-  razorpay_signature: {
+  razorpaySignature: {
+    type: String,
+    required: true,
+  },
+  orderCreationId: {
     type: String,
     required: true,
   },
 });
 
-const paymentModel = mongoose.model("payment", paymentSchema);
-module.exports = paymentModel;
+const FoodpaymentModel = mongoose.model
+    // name of the collection, the set of rules this collection should follow
+    ('paymentModel', paymentSchema);
+module.exports = FoodpaymentModel;
