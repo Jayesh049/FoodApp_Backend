@@ -21,7 +21,7 @@ const authRouter = require("./routes/authRoutes");
 const planRouter = require("./routes/planRoutes");
 const reviewRouter = require("./routes/reviewRoutes");
 const bookingRouter = require("./routes/bookingRoutes");
-const paymentRouter = require("./routes/paymentRoutes");
+
 // to  add post body data to req.body
 const rateLimit = require('express-rate-limit')
 
@@ -49,7 +49,7 @@ app.use("/api/v1/user" , userRouter);
 app.use("/api/v1/plan" , planRouter);
 app.use("/api/v1/review", reviewRouter);
 app.use("/api/v1/booking" , bookingRouter);
-app.use("/api/v1/payment" , paymentRouter);
+
 
   // app.use(function(req ,res){
   //   res.send("<h1>Backend  API</h1>");
