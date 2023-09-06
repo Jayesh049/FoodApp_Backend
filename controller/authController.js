@@ -75,6 +75,7 @@ async function  loginController(req , res){
             //before sending to frontend we have to delete password and confirm password so that we can login successfully in our front end
             //status hote hai kahi saare taaki hum error bata paaye ki kaha error aa rha hai frontend me
             res.status(200).json({//1
+                result: "ok", 
                 user})
           // res.send("user logged in ");
         }else{//400 status code jab client ne kuch galat kiya hai tabhi hum daalte hai
