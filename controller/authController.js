@@ -1,5 +1,3 @@
-// jwt.sign(jwtValue.toString())
-// jwt.sign(jwtValue.toString(), jwtSecret, { expiresIn: '1800s' });
 
 
 

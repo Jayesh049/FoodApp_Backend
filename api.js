@@ -1,5 +1,6 @@
 
 const express = require("express");
+const multer = require('multer');
 const app = express();
 const config  = require("dotenv");
 const KEY_ID = process.env.KEY_ID || require("./secrets").KEY_ID;
@@ -31,6 +32,9 @@ const apiLimiter = rateLimit({
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 })
+
+// to access the file public in image
+app.use('/uploads', express.static('uploads'))
 
 // Apply the rate limiting middleware to API calls only
 app.use(cors());

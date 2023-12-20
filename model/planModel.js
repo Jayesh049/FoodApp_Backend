@@ -7,6 +7,11 @@ let planSchema = new mongoose.Schema({
         unique: [true, "plan name should be unique"],
         maxlength: [40, "Your plan length is more than 40 characters"],
     },
+    image:{
+        // Buffer means it will contain in  binary format
+        type: String,
+        required: [ true , "You need to provide image"]
+    },
     duration: {
         type: Number,
         required: [true, "You Need to provide duration"]

@@ -8,11 +8,13 @@ const { getAllplansController,
     getbestPlans
 } =
     require('../controller/planController');
+
+    const upload = require('../middleware/upload')
 // plans -> get all the plans from db -> sensitive route -> protected route -> logged in i will only allow that person
 // '/' iske through get post kar rahe h 
 planRouter.route("/")
     .get(getAllplansController)
-    .post(createPlanController)
+    .post(upload.single('image'),createPlanController)
 
     planRouter.get("/sortByRating",getbestPlans)
 

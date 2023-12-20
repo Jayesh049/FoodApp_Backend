@@ -17,6 +17,10 @@ async function getAllplansController(req , res){
 async function createPlanController(req, res){
     try {
         let planObjData =req.body;
+
+        if(req.file){
+            req.body.image =req.file.path 
+        }
         // console.log(req.body); debugging
         //Object.keys is used to check keys inside object
         const isDataPresent = Object.keys(planObjData).length > 0;
