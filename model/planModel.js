@@ -1,4 +1,4 @@
-const mongoose = require('mongoose'); //npm i mongoose
+const mongoose = require('mongoose'); 
 
 let planSchema = new mongoose.Schema({
     name: {
@@ -8,7 +8,6 @@ let planSchema = new mongoose.Schema({
         maxlength: [40, "Your plan length is more than 40 characters"],
     },
     image:{
-        // Buffer means it will contain in  binary format
         type: String,
         required: [ true , "You need to provide image"]
     },
@@ -26,7 +25,6 @@ let planSchema = new mongoose.Schema({
             validator: function () {
                 return this.discount < this.price;
             },
-            // error
             message: "Discount must be less than actual price",
         },
     },

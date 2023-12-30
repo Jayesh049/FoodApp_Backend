@@ -40,14 +40,14 @@ app.use('/uploads', express.static('uploads'))
 app.use(cors());
 app.use('/api', apiLimiter);
 
-//to add post body data to req.body
-app.use(express.json());//getting users body data
-//add cookies to req.cookies
+
+app.use(express.json());
+
 app.use(cookieParser());
-//database ki jitni bhi call hoti hai wo async hoti h
 
 
-//making path version is good practice for developer
+
+
 app.use("/api/v1/auth" , authRouter);
 app.use("/api/v1/user" , userRouter);
 app.use("/api/v1/plan" , planRouter);
@@ -55,9 +55,6 @@ app.use("/api/v1/review", reviewRouter);
 app.use("/api/v1/booking" , bookingRouter);
 
 
-  // app.use(function(req ,res){
-  //   res.send("<h1>Backend  API</h1>");
-  // })
 
 app.get("/api/getkey", (req, res) =>
   res.status(200).json({ key: KEY_ID })
@@ -65,7 +62,7 @@ app.get("/api/getkey", (req, res) =>
 
 
 
-// localhost:3000 -> express API
+
 app.listen(process.env.PORT || 3000 ,function() {
     console.log("server started at port 3000");
 })

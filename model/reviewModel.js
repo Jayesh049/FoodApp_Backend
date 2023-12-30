@@ -16,10 +16,9 @@ const reviewSchema = new mongoose.Schema({
         default : Date.now
     },
     user : {
-        //info kiske ObjectId se humein id chaiye we will define it in  reference
-        type : mongoose.Schema.ObjectId,//id
+        type : mongoose.Schema.ObjectId,
         required : [true , "Review must belong to a user"],
-        ref:"FooduserModel"//FooduserModel -> user_id
+        ref:"FooduserModel"
     },
     plan :{
      type : mongoose.Schema.ObjectId,

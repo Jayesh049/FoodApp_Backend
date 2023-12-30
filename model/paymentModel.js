@@ -21,6 +21,5 @@ const paymentSchema = new mongoose.Schema({
 });
 
 const FoodpaymentModel = mongoose.model
-    // name of the collection, the set of rules this collection should follow
     ('paymentModel', paymentSchema);
 module.exports = FoodpaymentModel;

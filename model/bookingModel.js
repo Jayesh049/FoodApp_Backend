@@ -1,14 +1,14 @@
 const mongoose = require("mongoose");
 const bookingSchema = new mongoose.Schema({
     user: {
-        // info
-        type: mongoose.Schema.ObjectId, // _id
+        
+        type: mongoose.Schema.ObjectId, 
         required: [true, "Booking must belong to a user"],
         ref: "FooduserModel"
     },
     plan: {
-        // info
-        type: mongoose.Schema.ObjectId, //_id
+        
+        type: mongoose.Schema.ObjectId, 
         required: [true, "Booking must belong to a plan "],
         ref: "FoodplanModel"
     },
@@ -26,18 +26,6 @@ const bookingSchema = new mongoose.Schema({
         required: true,
         default: "pending"
     },
-    // razorpay_order_id: {
-    //     type: String,
-    //     required: true,
-    //   },
-    //   razorpay_payment_id: {
-    //     type: String,
-    //     required: true,
-    //   },
-    //   razorpay_signature: {
-    //     type: String,
-    //     required: true,
-    //   },
 })
 const bookingModel = mongoose.model("FoodbookingModel", bookingSchema);
 module.exports = bookingModel;

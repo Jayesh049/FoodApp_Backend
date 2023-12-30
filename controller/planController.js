@@ -1,6 +1,5 @@
 const FoodplanModel = require("../model/planModel");
 
-//with the help of mongoose find karke saare plans mangwa liye
 async function getAllplansController(req , res){
   try{
     let plans = await FoodplanModel.find();
@@ -13,7 +12,6 @@ async function getAllplansController(req , res){
   }
 }
 
-//request se humne object bnaya fir with the help of mongoose humne create kar liya
 async function createPlanController(req, res){
     try {
         let planObjData =req.body;
@@ -21,8 +19,6 @@ async function createPlanController(req, res){
         if(req.file){
             req.body.image =req.file.path 
         }
-        // console.log(req.body); debugging
-        //Object.keys is used to check keys inside object
         const isDataPresent = Object.keys(planObjData).length > 0;
         if(isDataPresent){
             let newPlan = await FoodplanModel.create(planObjData);
@@ -31,39 +27,32 @@ async function createPlanController(req, res){
                 result : "plan created",
                 plan : newPlan
             })
-        }//always remember to put else after if otherwise it gives you error
+        }
         else {
             res.status(404).json({
                 message : "data is incomplete"
             })
         }
-        //agr hum else nahi lagayenge toh hum log catch nahi kar payenge error ko
     }catch(err){
         console.log(err);
         res.status(500).json({ err: err.message });
     }
 }
 
-//jo object req ke through aaya and id nikal li toh kya wo data present hai agar present hai toh plan nikaalo
-//  for loop lagaa kar update karo and then save karo this gives us full control 
 async function updatePlanController(req, res){
     try {
         console.log("to update" , req.body);
         let planUpdateObjData = req.body;
-        //always remember to find correct way id
         let id = req.params.planRoutes;
         
         const isDataPresent = Object.keys(planUpdateObjData).length > 0;
         if(isDataPresent){
-            //get plan from db
             const plan = await FoodplanModel.findById(id);
 
-            //update the plan
             for(let key in planUpdateObjData){
                 plan[key] = planUpdateObjData[key];
             }
 
-            //save to db -> validators will run
             await plan.save();
             res.status(200).json({
                 plan
@@ -78,7 +67,6 @@ async function updatePlanController(req, res){
         res.status(500).json({ err: err.message });
     }
 }
-//delete by findByIdAndDelete with the help of mongoose rest same code as getPlanController
 async function deletePlanController(req, res){
     try {
         let id = req.params.planRoutes;
@@ -94,11 +82,10 @@ async function deletePlanController(req, res){
         })
     }
 }
-//id se humne plan nikaal li
 async function getPlanController(req, res){
   try {
-    let id = req.params.planRoutes;//isse hum id nikalte hai
-    let plan = await FoodplanModel.findById(id);//id ke through user with the help of mongoose
+    let id = req.params.planRoutes;
+    let plan = await FoodplanModel.findById(id);
     res.status(200).json({
         result: "plan found",
         plan : plan
@@ -114,7 +101,6 @@ async function getPlanController(req, res){
 async function getbestPlans(req, res) {
     try {
         let plans = await FoodplanModel.find().sort("-averageRating").limit(3);
-        // plans = plans.slice(0, 3);
         res.status(200).json({
             plans
         })
