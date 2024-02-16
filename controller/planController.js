@@ -1,4 +1,6 @@
 const FoodplanModel = require("../model/planModel");
+const fs = require("fs");
+
 
 async function getAllplansController(req , res){
   try{
@@ -15,10 +17,14 @@ async function getAllplansController(req , res){
 async function createPlanController(req, res){
     try {
         let planObjData =req.body;
-
+        
+        console.log(planObjData.name);
         if(req.file){
             req.body.image =req.file.path 
         }
+
+
+        
         const isDataPresent = Object.keys(planObjData).length > 0;
         if(isDataPresent){
             let newPlan = await FoodplanModel.create(planObjData);

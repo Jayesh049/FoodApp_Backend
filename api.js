@@ -28,7 +28,7 @@ const apiLimiter = rateLimit({
 })
 
 
-app.use('/uploads', express.static('uploads'))
+app.use('/uploads', express.static('uploads'));
 app.use(cors());
 app.use('/api', apiLimiter);
 

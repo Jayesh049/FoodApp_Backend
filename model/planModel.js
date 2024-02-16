@@ -9,7 +9,6 @@ let planSchema = new mongoose.Schema({
     },
     image:{
         type: String,
-        required: [ true , "You need to provide image"]
     },
     duration: {
         type: Number,
