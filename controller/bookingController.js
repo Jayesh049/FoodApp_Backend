@@ -3,6 +3,7 @@ const UserModel = require("../model/userModule");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const FoodpaymentModel = require("../model/paymentModel.js");
+const axios = require('axios');
 
 const KEY_ID = process.env.KEY_ID || require("../secrets").KEY_ID;
 const KEY_SECRET = process.env.KEY_SECRET || require("../secrets").KEY_SECRET;
@@ -12,31 +13,56 @@ const razorpay = new Razorpay({
 });
 async function initiateBooking(req, res) {
   try {
-    let booking = await FoodBookingModel.create(req.body);
+  
+    const plansResponse = await axios.get(`https://foodappbackend-lk5m.onrender.com/api/v1/plan/${req.body.plan}`);
+    console.log(plansResponse.data.plan)
+    const planDetails = plansResponse.data.plan;
+    console.log(planDetails);
+    const bookingData = {
+      bookedAt: new Date(),
+      priceAtThatTime: planDetails.price,
+      user: req.body.user,
+      plan: req.body.plan,
+      status: req.body.status,
+      planDetails: {
+        image: planDetails.image,
+        price: planDetails.price,
+        discount: planDetails.discount,
+        reviews: planDetails.reviews,
+      }
+    };
+
+    console.log(bookingData);
+
+    let booking = await FoodBookingModel.create(bookingData);
     let bookingId = booking["_id"];
     console.log(bookingId);
-    console.log(bookingId);
-    let userId = req.body.user;
-    console.log(userId);
-    let user = await UserModel.findById(userId);
-    console.log(user);
-    user.bookings.push(bookingId);
-    await user.save();
-    const amount = req.body.priceAtThatTime * 100;
+
+  
+    let user = await UserModel.findById(req.body.user);
+    if (user) {
+      user.bookings.push(bookingId);
+      await user.save();
+    }
+
+  
+    const amount = req.body.priceAtThatTime ;
     const currency = "INR";
     const options = {
       amount,
       currency,
       receipt: `rs_${bookingId}`,
     };
+
     const response = await razorpay.orders.create(options);
-    console.log(response);
+   
     res.status(200).json({
       id: response.id,
       currency: response.currency,
       amount: response.amount,
       booking: booking,
-      message: "booking created",
+      planDetails: planDetails, // Include all plan details in the response
+      message: "Booking created",
       entity: response.id,
       response,
     });
@@ -116,9 +142,32 @@ async function getBookings(req, res) {
 }
 
 
+async function deleteAllBookings(req, res) {
+  try {
+    // Delete all bookings
+    await FoodBookingModel.deleteMany({});
+
+    // Optionally, clear the bookings array in all users
+    await UserModel.updateMany({}, { $set: { bookings: [] } });
+
+    res.status(200).json({
+      message: "All bookings deleted successfully"
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+}
 module.exports = {
   initiateBooking,
   verifyPayment,
   getBookings,
   getBookingById,
+  deleteAllBookings,
 };
+
+
+
+

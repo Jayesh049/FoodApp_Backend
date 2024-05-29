@@ -1,38 +1,38 @@
 const reviewModel = require("../model/reviewModel");
 const planModel = require("../model/planModel");
 
-  async function createReviewController(req,res){
-    try{
-    
-    let review=await reviewModel.create(req.body);
-    let rating = review.rating;
-    let reviewId = review["_id"];
-    let currentPlan=await planModel.findById(id);
-    let totalNoofRating = currentPlan.reviews.length ;
-    let prevAvg = currentPlan.averageRating;
-    if(prevAvg){
-      let totalRatings = prevAvg * totalNoofRating;
-      let newAvg = (totalRatings + rating) / (totalNoofRating + 1);
-      currentPlan.averageRating = newAvg;
-    }else{
-      currentPlan.averageRating = rating;
+async function createReviewController(req, res) {
+  try {
+    const { rating, comment, user, plan } = req.body;
+
+    if (!user || !plan) {
+      return res.status(400).json({ message: 'User or plan information is missing.' });
     }
 
-    
-          currentPlan.reviews.push(reviewId);
+    const review = await reviewModel.create({ rating, comment, user, plan });
+
+    const currentPlan = await planModel.findById(plan);
+    if (!currentPlan) {
+      return res.status(404).json({ message: 'Plan not found.' });
+    }
+
+    const totalNoOfRatings = currentPlan.reviews.length;
+    const prevAvg = currentPlan.averageRating || 0;
+
+    const newAvg = ((prevAvg * totalNoOfRatings) + rating) / (totalNoOfRatings + 1);
+    currentPlan.averageRating = newAvg;
+    currentPlan.reviews.push(review._id);
 
     await currentPlan.save();
-    res.json({
-      message: "review created",
-      data: review,
+
+    res.status(201).json({
+      message: 'Review created successfully',
+      review,
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
-  catch(err){
-    return res.json({
-      message: err.message,
-    });
-  }
-  }
+}
   
    async function getAllReviewController(req, res){
     try{
