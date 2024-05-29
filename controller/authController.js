@@ -48,7 +48,7 @@ async function  loginController(req , res){
             res.status(200).json({
                 result: "ok", 
                 user,
-                token
+                token: `Bearer ${token}`
               })
         }else{
           res.status(403).json({
