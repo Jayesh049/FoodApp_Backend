@@ -10,6 +10,18 @@ let planSchema = new mongoose.Schema({
     image:{
         type: String,
     },
+    images: [{
+        type: String,
+        required: false
+    }],
+    video: {
+        type: String,
+        required: false
+    },
+    description: {
+        type: String,
+        maxlength: [500, "Description is too long"],
+    },
     duration: {
         type: Number,
         required: [true, "You Need to provide duration"]
@@ -26,6 +38,15 @@ let planSchema = new mongoose.Schema({
             },
             message: "Discount must be less than actual price",
         },
+    },
+    category: {
+        type: String,
+        enum: ["north_indian", "south_indian", "chinese", "dessert", "beverages"],
+        default: "north_indian",
+    },
+    icon: {
+        type: String,
+        default: "🍛",
     },
     reviews : {
         type : [mongoose.Schema.ObjectId],

@@ -1,31 +1,33 @@
-
 const FooduserModel = require("../model/userModule");
 
-async function profileController(req , res){
-  try{
-    const userId = req.userId;
-    const user = await FooduserModel.findById(userId);
+const USER_SAFE_SELECT =
+  "-password -confirmPassword -otp -otpExpiry -emailVerificationToken -emailVerificationExpiry";
+
+async function profileController(req, res, next) {
+  try {
+    const user = await FooduserModel.findById(req.userId).select(USER_SAFE_SELECT);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
     res.json({
-      data : user,
-      message : "Data about logged in user is send"
+      data: user,
+      message: "Data about logged in user is send",
     });
-  }catch(err){
-    res.end(err.message);
+  } catch (err) {
+    next(err);
   }
 }
-async function getAllUsersController(req , res){
-    try{
-      let users = await FooduserModel.find();
-      res.json(users);
-    }catch{
-      res.end(err.message);
-    }
+
+async function getAllUsersController(req, res, next) {
+  try {
+    const users = await FooduserModel.find().select(USER_SAFE_SELECT);
+    res.json(users);
+  } catch (err) {
+    next(err);
   }
-  
+}
 
-
-
-  module.exports ={
-     profileController : profileController,
-     getAllUsersController : getAllUsersController
-  }
+module.exports = {
+  profileController,
+  getAllUsersController,
+};

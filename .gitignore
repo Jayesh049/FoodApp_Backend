@@ -1,2 +1,8 @@
 secrets.js
 node_modules
+.env
+*.rar
+*.zip
+Backend.rar
+uploads/*
+!uploads/.gitkeep

@@ -19,11 +19,40 @@ const bookingSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    quantity: {
+        type: Number,
+        required: true,
+        default: 1
+    },
     status: {
         type: String,
-        enum: ["pending", "failed", "success"],
+        enum: ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "failed", "cancelled"],
         required: true,
         default: "pending"
+    },
+    deliveryStatus: {
+        currentStatus: {
+            type: String,
+            enum: ["order_placed", "restaurant_confirmed", "preparing", "ready_for_pickup", "picked_up", "on_the_way", "nearby", "delivered"],
+            default: "order_placed"
+        },
+        estimatedDeliveryTime: {
+            type: Date
+        },
+        actualDeliveryTime: {
+            type: Date
+        },
+        driverLocation: {
+            latitude: Number,
+            longitude: Number,
+            lastUpdated: {
+                type: Date,
+                default: Date.now
+            }
+        },
+        deliveryNotes: {
+            type: String
+        }
     },
     planDetails: {
         image: {
