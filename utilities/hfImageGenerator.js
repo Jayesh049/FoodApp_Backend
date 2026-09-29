@@ -10,7 +10,7 @@ function getPrimaryModel() {
   return (
     process.env.HF_IMAGE_MODEL ||
     require("../secrets").HF_IMAGE_MODEL ||
-    "stabilityai/sdxl-turbo"
+    "stabilityai/stable-diffusion-3-medium-diffusers"
   );
 }
 
@@ -18,7 +18,7 @@ function getFallbackModel() {
   return (
     process.env.HF_IMAGE_FALLBACK_MODEL ||
     require("../secrets").HF_IMAGE_FALLBACK_MODEL ||
-    "stabilityai/stable-diffusion-xl-base-1.0"
+    "stabilityai/stable-diffusion-3-medium-diffusers"
   );
 }
 
@@ -37,6 +37,88 @@ function buildFoodPrompt(dishName, categoryLabel) {
     "appetizing plated dish, natural lighting, shallow depth of field, " +
     "restaurant quality, high detail, centered composition, no text, no watermark"
   );
+}
+
+/**
+ * FOODAPP brand prompt for a specific gallery shot (01–05).
+ * Unique per (dish, shot) via explicit composition + dish name.
+ */
+function buildShotPrompt(dish, shot) {
+  const { BRAND_POSITIVE } = require("./dishCatalog200");
+  const name = typeof dish === "string" ? dish : dish.name;
+  const cuisine =
+    (typeof dish === "object" && dish.cuisineLabel) ||
+    (typeof dish === "object" && dish.category) ||
+    "";
+  const composition =
+    (typeof shot === "object" && shot.composition) ||
+    String(shot || "hero food photography");
+  const shotLabel =
+    (typeof shot === "object" && (shot.label || shot.key || shot.id)) || "shot";
+
+  return (
+    `${BRAND_POSITIVE}. ` +
+    `Single standalone photograph of vegetarian ${name}` +
+    (cuisine ? ` (${cuisine})` : "") +
+    `. Shot style: ${shotLabel}. Composition: ${composition}. ` +
+    (typeof dish === "object" && dish.visualHint
+      ? `Accurate dish look: ${dish.visualHint}. `
+      : "") +
+    `Correct signature color and ingredients for ${name}. ` +
+    `Only one dish subject, no other main dishes, no collage layout.`
+  );
+}
+
+function brandNegativePrompt() {
+  const { BRAND_NEGATIVE } = require("./dishCatalog200");
+  return BRAND_NEGATIVE;
+}
+
+/**
+ * Stable numeric seed from dish slug + shot id (for providers that honor seed).
+ */
+function shotSeed(slug, shotId) {
+  const s = `${slug}-${shotId}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i += 1) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h) % 2147483647;
+}
+
+/**
+ * Generate and save one gallery shot under uploads/dishes/{slug}/{slug}-0N.png
+ */
+async function generateAndSaveGalleryShot(dish, shot, uploadsRoot, options = {}) {
+  const slug = dish.slug || slugify(dish.name);
+  const shotId = shot.id || String(shot).padStart(2, "0");
+  const outDir = path.join(uploadsRoot, "dishes", slug);
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+  const filename = `${slug}-${shotId}.png`;
+  const absPath = path.join(outDir, filename);
+  const prompt = buildShotPrompt(dish, shot);
+  const seedBase = shotSeed(slug, shotId);
+  const seed =
+    options.seedSalt != null
+      ? (seedBase + Number(options.seedSalt)) % 2147483647
+      : seedBase;
+
+  const buffer = await generateImageBuffer(prompt, {
+    width: options.width || 768,
+    height: options.height || 768,
+    steps: options.steps || 28,
+    guidanceScale: options.guidanceScale ?? 7,
+    negativePrompt: brandNegativePrompt(),
+    seed,
+  });
+
+  fs.writeFileSync(absPath, buffer);
+  const relative = path
+    .relative(path.join(__dirname, ".."), absPath)
+    .replace(/\\/g, "/");
+  return { relative, absPath, prompt, seed };
 }
 
 async function callHfTextToImage(model, prompt, options = {}) {
@@ -70,6 +152,7 @@ async function callHfTextToImage(model, prompt, options = {}) {
             width,
             height,
             negative_prompt: negativePrompt,
+            ...(options.seed != null ? { seed: options.seed } : {}),
           },
           options: { wait_for_model: true },
         },
@@ -114,6 +197,12 @@ async function callHfTextToImage(model, prompt, options = {}) {
       }
       lastError = new Error(message);
 
+      if (res.status === 402 || /credits|billing|quota/i.test(message)) {
+        throw new Error(
+          `HF credits exhausted: ${message}. Top up Inference Providers credits or set SD_BASE_URL for local A1111.`
+        );
+      }
+
       if (res.status === 503 || /loading/i.test(message)) {
         await new Promise((r) => setTimeout(r, 8000));
         continue;
@@ -130,7 +219,39 @@ async function callHfTextToImage(model, prompt, options = {}) {
 }
 
 /**
- * Generate an image buffer from a prompt. Tries primary then fallback model.
+ * Free fallback when HF Inference credits are exhausted.
+ */
+async function generateViaPollinations(prompt, options = {}) {
+  const width = options.width || 1024;
+  const height = options.height || 1024;
+  const seed = options.seed != null ? options.seed : Math.floor(Math.random() * 1e9);
+  const encoded = encodeURIComponent(String(prompt).slice(0, 450));
+  const url =
+    `https://image.pollinations.ai/prompt/${encoded}` +
+    `?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
+
+  const res = await axios.get(url, {
+    responseType: "arraybuffer",
+    timeout: 3 * 60 * 1000,
+    validateStatus: () => true,
+    headers: { Accept: "image/*" },
+  });
+  const contentType = String(res.headers["content-type"] || "");
+  if (res.status >= 200 && res.status < 300 && contentType.includes("image")) {
+    return Buffer.from(res.data);
+  }
+  let message = `Pollinations HTTP ${res.status}`;
+  try {
+    message = Buffer.from(res.data).toString("utf8").slice(0, 300) || message;
+  } catch {
+    /* ignore */
+  }
+  throw new Error(message);
+}
+
+/**
+ * Generate an image buffer from a prompt.
+ * Tries HF primary → HF fallback → Pollinations (when HF credits depleted).
  */
 async function generateImageBuffer(prompt, options = {}) {
   const primary = options.model || getPrimaryModel();
@@ -138,15 +259,22 @@ async function generateImageBuffer(prompt, options = {}) {
   try {
     return await callHfTextToImage(primary, prompt, options);
   } catch (err) {
-    if (fallback && fallback !== primary) {
-      console.warn(`[HF] primary model failed (${err.message}); trying fallback ${fallback}`);
-      return callHfTextToImage(fallback, prompt, {
-        ...options,
-        steps: options.steps || 4,
-        guidanceScale: options.guidanceScale ?? 1,
-      });
+    const msg = String(err.message || "");
+    const creditsGone = /credits exhausted|402|monthly included/i.test(msg);
+    if (!creditsGone && fallback && fallback !== primary) {
+      try {
+        console.warn(`[HF] primary model failed (${err.message}); trying fallback ${fallback}`);
+        return await callHfTextToImage(fallback, prompt, {
+          ...options,
+          steps: options.steps || 28,
+          guidanceScale: options.guidanceScale ?? 7,
+        });
+      } catch (err2) {
+        err = err2;
+      }
     }
-    throw err;
+    console.warn(`[HF] unavailable — using Pollinations fallback (${err.message})`);
+    return generateViaPollinations(prompt, options);
   }
 }
 
@@ -172,7 +300,11 @@ module.exports = {
   getHfToken,
   getPrimaryModel,
   buildFoodPrompt,
+  buildShotPrompt,
+  brandNegativePrompt,
+  shotSeed,
   generateImageBuffer,
   generateAndSaveDishImage,
+  generateAndSaveGalleryShot,
   slugify,
 };

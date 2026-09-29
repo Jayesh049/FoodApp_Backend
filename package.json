@@ -17,6 +17,8 @@
     "apply-dish-images:rag": "node scripts/fix-plan-images.js --rag",
     "generate-plan-images-hf": "node scripts/generate-plan-images-hf.js",
     "generate-plan-images-hf:rag": "node scripts/generate-plan-images-hf.js --rag",
+    "generate-dish-gallery-1000": "node scripts/generate-dish-gallery-1000.js",
+    "import-dish-plans-200": "node scripts/import-dish-plans-200.js",
     "audit-fix-plan-media": "node scripts/audit-fix-plan-media.js",
     "audit-fix-plan-media:rag": "node scripts/audit-fix-plan-media.js --rag"
   },
