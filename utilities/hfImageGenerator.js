@@ -3,13 +3,12 @@ const path = require("path");
 const axios = require("axios");
 
 function getHfToken() {
-  return process.env.HF_TOKEN || require("../secrets").HF_TOKEN || "";
+  return process.env.HF_TOKEN || "";
 }
 
 function getPrimaryModel() {
   return (
     process.env.HF_IMAGE_MODEL ||
-    require("../secrets").HF_IMAGE_MODEL ||
     "stabilityai/stable-diffusion-3-medium-diffusers"
   );
 }
@@ -17,7 +16,6 @@ function getPrimaryModel() {
 function getFallbackModel() {
   return (
     process.env.HF_IMAGE_FALLBACK_MODEL ||
-    require("../secrets").HF_IMAGE_FALLBACK_MODEL ||
     "stabilityai/stable-diffusion-3-medium-diffusers"
   );
 }

@@ -3,7 +3,10 @@
  */
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 const nodemailer = require("nodemailer");
-const secrets = require("../secrets");
+const secrets = {
+  APP_EMAIL: process.env.APP_EMAIL || "",
+  APP_PASSWORD: process.env.APP_PASSWORD || "",
+};
 
 async function mailSender() {
   let transporter = nodemailer.createTransport({

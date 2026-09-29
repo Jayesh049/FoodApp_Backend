@@ -5,13 +5,24 @@ const Razorpay = require("razorpay");
 const crypto = require("crypto");
 const FoodpaymentModel = require("../model/paymentModel.js");
 
-const KEY_ID = process.env.KEY_ID || require("../secrets").KEY_ID;
-const KEY_SECRET = process.env.KEY_SECRET || require("../secrets").KEY_SECRET;
+const KEY_ID = process.env.KEY_ID || "";
+const KEY_SECRET = process.env.KEY_SECRET || "";
 
-const razorpay = new Razorpay({
-  key_id: KEY_ID,
-  key_secret: KEY_SECRET,
-});
+let razorpay = null;
+function getRazorpay() {
+  if (!KEY_ID || !KEY_SECRET) {
+    const err = new Error("KEY_ID and KEY_SECRET must be set in the environment");
+    err.statusCode = 503;
+    throw err;
+  }
+  if (!razorpay) {
+    razorpay = new Razorpay({
+      key_id: KEY_ID,
+      key_secret: KEY_SECRET,
+    });
+  }
+  return razorpay;
+}
 
 function sameUserId(a, b) {
   return String(a) === String(b);
@@ -84,7 +95,7 @@ async function initiateBooking(req, res, next) {
       receipt: `rs_${bookings[0]._id}`,
     };
 
-    const response = await razorpay.orders.create(options);
+    const response = await getRazorpay().orders.create(options);
 
     res.status(200).json({
       id: response.id,
@@ -117,7 +128,7 @@ async function confirmBookingsAfterPayment(bookingIds, orderCreationId, ownerUse
   if (!orderCreationId) return;
 
   try {
-    const order = await razorpay.orders.fetch(orderCreationId);
+    const order = await getRazorpay().orders.fetch(orderCreationId);
     const receipt = order && order.receipt;
     if (!receipt || !receipt.startsWith("rs_")) return;
 
@@ -178,7 +189,7 @@ async function verifyPayment(req, res, next) {
         });
       }
     } else if (orderCreationId) {
-      const order = await razorpay.orders.fetch(orderCreationId);
+      const order = await getRazorpay().orders.fetch(orderCreationId);
       const receipt = order && order.receipt;
       if (receipt && receipt.startsWith("rs_")) {
         const primary = await FoodBookingModel.findById(receipt.slice(3));

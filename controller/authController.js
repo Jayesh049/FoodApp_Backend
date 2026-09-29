@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const JWTSECRET = process.env.JWTSECRET || require("../secrets").JWTSECRET;
+const JWTSECRET = process.env.JWTSECRET || "";
 
 const FooduserModel = require("../model/userModule");
 const mailSender = require("../utilities/mailSender");

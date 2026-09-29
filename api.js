@@ -6,9 +6,8 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 
-const KEY_ID = process.env.KEY_ID || require("./secrets").KEY_ID;
-const FRONTEND_URL =
-  process.env.FRONTEND_URL || require("./secrets").FRONTEND_URL || "http://localhost:3001";
+const KEY_ID = process.env.KEY_ID || "";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3001";
 
 const userRouter = require("./routes/userRoutes");
 const authRouter = require("./routes/authRoutes");
@@ -101,6 +100,12 @@ app.get("/health/ready", async (req, res) => {
 });
 
 app.use(errorHandler);
+
+["DB_LINK", "JWTSECRET"].forEach((key) => {
+  if (!process.env[key]) {
+    console.error(`[config] Missing ${key}. Set it in Render Environment, not secrets.js.`);
+  }
+});
 
 const port = process.env.PORT || 3000;
 app.listen(port, function () {
