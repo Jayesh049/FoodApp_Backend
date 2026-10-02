@@ -6,3 +6,5 @@ node_modules
 Backend.rar
 uploads/*
 !uploads/.gitkeep
+!uploads/user-plans/
+!uploads/dishes/
