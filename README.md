@@ -117,14 +117,6 @@ Copy [`.env.example`](.env.example) → `.env`. **Never commit `.env` or `secret
 
 ---
 
-## Security posture (honest)
-
-This project is built as a **portfolio-grade full-stack API** with real auth, payments, and hardening work in progress (Helmet, CORS, rate limits, ObjectId validation, ownership checks on bookings).
-
-It is **not** a claim that one repo alone guarantees a $200k secure-remote offer — those roles also need interview depth, production ops, and broader experience. Use this repo to show how you design APIs and think about security.
-
----
-
 ## Sibling frontend
 
 UI lives here: **[Jayesh049/FoodApp_Frontend](https://github.com/Jayesh049/FoodApp_Frontend)**  
