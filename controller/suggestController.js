@@ -2,11 +2,18 @@ const FoodplanModel = require("../model/planModel");
 const reviewModel = require("../model/reviewModel");
 const mongoose = require("mongoose");
 const axios = require("axios");
+const logger = require("../utilities/logger");
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || "llama3.1";
-const EMBED_DIMENSIONS = 768;
+const {
+  gatePlanIds,
+  stripUnknownIds,
+  ownBookingSummary,
+  MAX_SUGGEST_QUERY,
+} = require("../utilities/suggestGuard");
+const FoodBookingModel = require("../model/bookingModel");
 
 function ragCollection() {
   if (!mongoose.connection.db) {
@@ -161,8 +168,8 @@ async function upsertPlanEmbedding(plan) {
     );
     return { ok: true };
   } catch (err) {
-    console.log("upsertPlanEmbedding error:", err?.message || err);
-    return { ok: false, error: err.message };
+    logger.warn({ err }, "upsert plan embedding failed");
+    return { ok: false };
   }
 }
 
@@ -175,43 +182,53 @@ async function logRagStartupStatus() {
   try {
     const status = await getRagStatus();
     if (!status.ragReady) {
-      console.warn("[RAG] Not fully ready:");
-      if (!status.ollama.reachable) {
-        console.warn("  - Ollama not reachable at", OLLAMA_BASE_URL);
-      } else {
-        if (!status.ollama.embedModelAvailable) {
-          console.warn("  - Missing embed model:", OLLAMA_EMBED_MODEL, "(run: ollama pull", OLLAMA_EMBED_MODEL + ")");
-        }
-        if (!status.ollama.chatModelAvailable) {
-          console.warn("  - Missing chat model:", OLLAMA_CHAT_MODEL, "(run: ollama pull", OLLAMA_CHAT_MODEL + ")");
-        }
-      }
-      if (!status.vectorIndexReady) {
-        console.warn("  - Vector index:", status.vectorIndexReason);
-        console.warn("  - See Backend/docs/RAG_SETUP.md for MongoDB Atlas index setup");
-      }
+      logger.warn({ status }, "RAG not fully ready");
     } else {
-      console.log("[RAG] Ready —", status.docCount, "documents indexed");
+      logger.info({ docCount: status.docCount }, "RAG ready");
     }
   } catch (err) {
-    console.warn("[RAG] Startup check failed:", err.message);
+    logger.warn({ err }, "RAG startup check failed");
   }
 }
 
-async function querySuggestions(req, res) {
+const EMBED_DIMENSIONS = 768;
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function plansByName(query) {
+  const safe = escapeRegex(String(query || "").slice(0, MAX_SUGGEST_QUERY));
+  if (!safe) return [];
+  const plans = await FoodplanModel.find({ name: new RegExp(safe, "i") }).limit(6);
+  const { filterVegetarianPlans } = require("../utilities/vegFilter");
+  return filterVegetarianPlans(plans);
+}
+
+async function querySuggestions(req, res, next) {
   try {
     const { query } = req.body || {};
     if (!query || typeof query !== "string") {
       return res.status(400).json({ message: "query is required" });
     }
+    if (query.length > MAX_SUGGEST_QUERY) {
+      return res.status(400).json({ message: "query is too long" });
+    }
 
     let embedding;
+    let degraded = false;
     try {
       embedding = await ollamaEmbed(query);
     } catch (err) {
-      console.log("ollamaEmbed error:", err?.message || err);
-      return res.status(503).json({
-        message: "AI service unavailable. Start Ollama and pull nomic-embed-text.",
+      degraded = true;
+      const plans = await plansByName(query);
+      return res.status(200).json({
+        query,
+        answer: null,
+        degraded: true,
+        plans,
+        citations: [],
+        message: "Showing name matches because AI is unavailable.",
       });
     }
 
@@ -219,13 +236,14 @@ async function querySuggestions(req, res) {
     try {
       docs = await vectorSearch(embedding, 6);
     } catch (e) {
-      console.log("vectorSearch error:", e?.message || e);
-      return res.status(501).json({
-        message:
-          "Vector search is not configured. Create a MongoDB vector index on rag_documents.embedding.",
-        hint:
-          "Create index (name: rag_embedding_index) and retry, or set VECTOR_INDEX_NAME env. See Backend/docs/RAG_SETUP.md",
-        error: e?.message || String(e),
+      const plans = await plansByName(query);
+      return res.status(200).json({
+        query,
+        answer: null,
+        degraded: true,
+        plans,
+        citations: [],
+        message: "Showing name matches because search index is unavailable.",
       });
     }
 
@@ -239,30 +257,31 @@ async function querySuggestions(req, res) {
       .map((d, i) => `#${i + 1} (${d.sourceType}:${d.sourceId}) ${d.title}\n${d.text}`)
       .join("\n\n");
 
+    const allowedIds = vegDocs.map((d) => String(d.sourceId));
     let answer;
     try {
-      answer = await ollamaChat([
-        {
-          role: "system",
-          content:
-            "You are a helpful vegetarian food-plan assistant. Recommend only vegetarian dishes. Use only the provided context. If context is insufficient, ask a clarifying question and suggest 2-3 next steps.",
-        },
-        {
-          role: "user",
-          content: `User query: ${query}\n\nContext:\n${context}`,
-        },
-      ]);
+      answer = stripUnknownIds(
+        await ollamaChat([
+          {
+            role: "system",
+            content:
+              "You are a helpful vegetarian food-plan assistant. Recommend only vegetarian dishes. Use only the provided context. If context is insufficient, ask a clarifying question and suggest 2-3 next steps. Do not invent dish ids.",
+          },
+          {
+            role: "user",
+            content: `User query: ${query}\n\nContext:\n${context}`,
+          },
+        ]),
+        allowedIds
+      );
     } catch (err) {
-      console.log("ollamaChat error:", err?.message || err);
-      return res.status(503).json({
-        message: "AI chat unavailable. Start Ollama and pull llama3.1.",
-      });
+      degraded = true;
+      answer = null;
     }
 
-    return res.status(200).json({
-      query,
-      answer,
-      citations: vegDocs.map((d) => {
+    const citations = vegDocs
+      .filter((d) => gatePlanIds(allowedIds, [d.sourceId]).length === 1)
+      .map((d) => {
         const imageFromText = String(d.text || "").match(/Image:\s*(\S+)/);
         return {
           sourceType: d.sourceType,
@@ -272,12 +291,17 @@ async function querySuggestions(req, res) {
           score: d.score,
           image: d.image || (imageFromText ? imageFromText[1] : undefined),
         };
-      }),
-      matchedItems: vegDocs,
+      });
+
+    return res.status(200).json({
+      query,
+      answer,
+      degraded,
+      citations,
+      plans: citations.filter((c) => c.planId).map((c) => c.planId),
     });
   } catch (err) {
-    console.log("querySuggestions error:", err?.response?.data || err);
-    return res.status(500).json({ message: err.message, error: err?.response?.data || err });
+    return next(err);
   }
 }
 
@@ -297,10 +321,12 @@ async function semanticSearchPlans(req, res) {
     try {
       embedding = await ollamaEmbed(q);
     } catch (err) {
+      const plans = await plansByName(q);
       return res.status(200).json({
         query: q,
-        plans: [],
-        message: "Semantic search unavailable (Ollama not running)",
+        plans,
+        degraded: true,
+        message: "Semantic search unavailable. Showing name matches.",
       });
     }
 
@@ -308,10 +334,12 @@ async function semanticSearchPlans(req, res) {
     try {
       docs = await vectorSearch(embedding, 10);
     } catch (err) {
+      const plans = await plansByName(q);
       return res.status(200).json({
         query: q,
-        plans: [],
-        message: "Semantic search unavailable (vector index not configured)",
+        plans,
+        degraded: true,
+        message: "Semantic search unavailable. Showing name matches.",
       });
     }
 
@@ -342,7 +370,7 @@ async function semanticSearchPlans(req, res) {
       })),
     });
   } catch (err) {
-    console.log("semanticSearchPlans error:", err?.message || err);
+    logger.warn({ err }, "semantic search failed");
     return res.status(200).json({
       query: q,
       plans: [],
@@ -351,7 +379,7 @@ async function semanticSearchPlans(req, res) {
   }
 }
 
-async function reindexSuggestions(req, res) {
+async function reindexSuggestions(req, res, next) {
   try {
     const coll = ragCollection();
 
@@ -397,8 +425,31 @@ async function reindexSuggestions(req, res) {
       reviewsIndexed: reviews.length,
     });
   } catch (err) {
-    console.log("reindexSuggestions error:", err?.response?.data || err);
-    return res.status(500).json({ message: err.message, error: err?.response?.data || err });
+    return next(err);
+  }
+}
+
+async function phraseOwnOrders(req, res, next) {
+  try {
+    const rows = await FoodBookingModel.find({ user: req.userId })
+      .sort({ bookedAt: -1 })
+      .limit(8);
+    const bookings = rows.map(ownBookingSummary);
+    try {
+      const answer = await ollamaChat([
+        {
+          role: "system",
+          content:
+            "Phrase only the orders in the JSON. Do not invent orders, prices, or other users.",
+        },
+        { role: "user", content: JSON.stringify(bookings) },
+      ]);
+      return res.status(200).json({ bookings, answer, degraded: false });
+    } catch (err) {
+      return res.status(200).json({ bookings, answer: null, degraded: true });
+    }
+  } catch (err) {
+    return next(err);
   }
 }
 
@@ -407,6 +458,7 @@ module.exports = {
   reindexSuggestions,
   getSuggestHealth,
   semanticSearchPlans,
+  phraseOwnOrders,
   logRagStartupStatus,
   upsertPlanEmbedding,
 };

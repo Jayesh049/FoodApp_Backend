@@ -3,7 +3,7 @@ const path = require("path");
 const axios = require("axios");
 
 function getHfToken() {
-  return process.env.HF_TOKEN || "";
+  return require("./config").HF_TOKEN;
 }
 
 function getPrimaryModel() {

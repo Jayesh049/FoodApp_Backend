@@ -1,26 +1,24 @@
 const SectionModel = require("../model/sectionModel");
 
-async function listSections(req, res) {
+async function listSections(req, res, next) {
   try {
     const sections = await SectionModel.find({ isActive: true }).sort({ order: 1, createdAt: -1 });
     return res.status(200).json({ sections });
   } catch (err) {
-    console.log("listSections error:", err);
-    return res.status(500).json({ message: err.message });
+    return next(err);
   }
 }
 
-async function listAllSectionsAdmin(req, res) {
+async function listAllSectionsAdmin(req, res, next) {
   try {
     const sections = await SectionModel.find().sort({ order: 1, createdAt: -1 });
     return res.status(200).json({ sections });
   } catch (err) {
-    console.log("listAllSectionsAdmin error:", err);
-    return res.status(500).json({ message: err.message });
+    return next(err);
   }
 }
 
-async function createSection(req, res) {
+async function createSection(req, res, next) {
   try {
     const data = req.body || {};
     if (!data.key || !data.title) {
@@ -29,12 +27,11 @@ async function createSection(req, res) {
     const section = await SectionModel.create(data);
     return res.status(201).json({ message: "Section created", section });
   } catch (err) {
-    console.log("createSection error:", err);
-    return res.status(500).json({ message: err.message });
+    return next(err);
   }
 }
 
-async function updateSection(req, res) {
+async function updateSection(req, res, next) {
   try {
     const id = req.params.id;
     const updates = req.body || {};
@@ -49,12 +46,11 @@ async function updateSection(req, res) {
     await section.save();
     return res.status(200).json({ message: "Section updated", section });
   } catch (err) {
-    console.log("updateSection error:", err);
-    return res.status(500).json({ message: err.message });
+    return next(err);
   }
 }
 
-async function deleteSection(req, res) {
+async function deleteSection(req, res, next) {
   try {
     const id = req.params.id;
     const section = await SectionModel.findByIdAndUpdate(
@@ -65,8 +61,7 @@ async function deleteSection(req, res) {
     if (!section) return res.status(404).json({ message: "Section not found" });
     return res.status(200).json({ message: "Section archived", section });
   } catch (err) {
-    console.log("deleteSection error:", err);
-    return res.status(500).json({ message: err.message });
+    return next(err);
   }
 }
 

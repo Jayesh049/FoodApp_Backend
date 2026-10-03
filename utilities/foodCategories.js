@@ -2,7 +2,7 @@ const FOOD_CATEGORIES = [
   {
     id: "north_indian",
     label: "North Indian",
-    icon: "🌿",
+    icon: "🍲",
     color: "#E8B86D",
     bases: [
       "Paneer Butter Masala", "Dal Makhani", "Aloo Gobi", "Chole Bhature",
@@ -14,7 +14,7 @@ const FOOD_CATEGORIES = [
   {
     id: "south_indian",
     label: "South Indian",
-    icon: "🌿",
+    icon: "🥥",
     color: "#7CB342",
     bases: [
       "Masala Dosa", "Idli Sambar", "Medu Vada", "Ven Pongal", "Coconut Chutney",
@@ -26,7 +26,7 @@ const FOOD_CATEGORIES = [
   {
     id: "chinese",
     label: "Indo-Chinese",
-    icon: "🌿",
+    icon: "🍜",
     color: "#EF5350",
     bases: [
       "Veg Fried Rice", "Chilli Paneer", "Hakka Noodles", "Veg Manchurian", "Veg Spring Rolls",
@@ -38,7 +38,7 @@ const FOOD_CATEGORIES = [
   {
     id: "dessert",
     label: "Desserts",
-    icon: "🌿",
+    icon: "🍮",
     color: "#F48FB1",
     bases: [
       "Gulab Jamun", "Rasmalai", "Kulfi Slice", "Gajar Halwa", "Moong Dal Halwa",
@@ -50,7 +50,7 @@ const FOOD_CATEGORIES = [
   {
     id: "beverages",
     label: "Beverages",
-    icon: "🌿",
+    icon: "🥤",
     color: "#4FC3F7",
     bases: [
       "Mango Lassi", "Masala Chai", "Cold Coffee", "Fresh Orange Juice", "Berry Smoothie",

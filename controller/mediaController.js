@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
+const logger = require("../utilities/logger");
 const {
   getHfToken,
   generateImageBuffer,
@@ -64,13 +65,13 @@ async function generateViaHfOrSd(body) {
         guidanceScale: body.cfgScale != null ? safeNumber(body.cfgScale, 0) : 0,
       });
     } catch (hfErr) {
-      console.warn("[media] HF generate failed, trying SD:", hfErr.message);
+      logger.warn({ err: hfErr }, "HF image failed, trying Stable Diffusion");
     }
   }
   return generateViaSd(body);
 }
 
-async function generateImage(req, res) {
+async function generateImage(req, res, next) {
   try {
     const body = req.body || {};
     if (!body.prompt || typeof body.prompt !== "string") {
@@ -86,15 +87,11 @@ async function generateImage(req, res) {
       ...saved,
     });
   } catch (err) {
-    console.log("generateImage error:", err?.response?.data || err);
-    return res.status(500).json({
-      message: err.message,
-      error: err?.response?.data || err.raw || err,
-    });
+    return next(err);
   }
 }
 
-async function bulkGenerateImages(req, res) {
+async function bulkGenerateImages(req, res, next) {
   try {
     const { prompts, ...rest } = req.body || {};
 
@@ -119,11 +116,7 @@ async function bulkGenerateImages(req, res) {
       results,
     });
   } catch (err) {
-    console.log("bulkGenerateImages error:", err?.response?.data || err);
-    return res.status(500).json({
-      message: err.message,
-      error: err?.response?.data || err,
-    });
+    return next(err);
   }
 }
 

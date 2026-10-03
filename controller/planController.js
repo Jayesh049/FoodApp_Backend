@@ -1,3 +1,4 @@
+const logger = require("../utilities/logger");
 const FoodplanModel = require("../model/planModel");
 const { upsertPlanEmbedding } = require("./suggestController");
 const fs = require("fs");
@@ -31,7 +32,7 @@ function parsePlanFields(body) {
 }
 
 
-async function getAllplansController(req , res){
+async function getAllplansController(req, res, next){
   try{
     let plans = await FoodplanModel.find();
     if (String(req.query.diet || "").toLowerCase() === "veg") {
@@ -42,12 +43,11 @@ async function getAllplansController(req , res){
         Allplans : plans
     })
   }catch(err){
-    console.log(err);
-    res.status(500).json({err : err.message});
+    next(err);
   }
 }
 
-async function createPlanController(req, res){
+async function createPlanController(req, res, next){
     try {
         const parsed = parsePlanFields(req.body);
         if (parsed.error) {
@@ -73,7 +73,7 @@ async function createPlanController(req, res){
         }
 
         let newPlan = await FoodplanModel.create(planObjData);
-        console.log("Plan created with images:", newPlan);
+        logger.info({ planId: newPlan && newPlan._id }, "plan created with images");
 
         const embedResult = await upsertPlanEmbedding(newPlan);
 
@@ -86,12 +86,11 @@ async function createPlanController(req, res){
                 : embedResult.error || "RAG embed skipped (Ollama/index not ready)",
         });
     }catch(err){
-        console.log(err);
-        res.status(500).json({ err: err.message });
+        next(err);
     }
 }
 
-async function updatePlanController(req, res){
+async function updatePlanController(req, res, next){
     try {
         const id = req.params.planRoutes;
         const plan = await FoodplanModel.findById(id);
@@ -132,11 +131,10 @@ async function updatePlanController(req, res){
             ragEmbedded: embedResult.ok,
         });
     }catch (err){
-        console.log(err);
-        res.status(500).json({ err: err.message });
+        next(err);
     }
 }
-async function deletePlanController(req, res){
+async function deletePlanController(req, res, next){
     try {
         let id = req.params.planRoutes;
         let plan = await FoodplanModel.findById(id);
@@ -171,9 +169,9 @@ async function deletePlanController(req, res){
             if (fs.existsSync(fullPath)) {
                 try {
                     fs.unlinkSync(fullPath);
-                    console.log(`Deleted file: ${filePath}`);
+                    logger.info({ filePath }, "deleted upload");
                 } catch (fileErr) {
-                    console.log(`Error deleting file ${filePath}:`, fileErr.message);
+                    logger.warn({ err: fileErr, filePath }, "delete upload failed");
                 }
             }
         });
@@ -189,13 +187,10 @@ async function deletePlanController(req, res){
             }
         });
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            err: err.message
-        });
+        next(err);
     }
 }
-async function getPlanController(req, res){
+async function getPlanController(req, res, next){
   try {
     const id = req.params.planRoutes;
     if (!id || !require('mongoose').Types.ObjectId.isValid(id)) {
@@ -216,14 +211,11 @@ async function getPlanController(req, res){
       plan,
     });
   } catch (err) {
-    console.log(err);
-    if (!res.headersSent) {
-      return res.status(500).json({ err: err.message });
-    }
+    if (!res.headersSent) return next(err);
   }
 }
 
-async function getbestPlans(req, res) {
+async function getbestPlans(req, res, next) {
     try {
         let plans = await FoodplanModel.find().sort("-averageRating").limit(24);
         const { filterVegetarianPlans } = require("../utilities/vegFilter");
@@ -232,15 +224,12 @@ async function getbestPlans(req, res) {
             plans
         })
     } catch (err) {
-        console.log(err);
-        res.status(200).json({
-            message: err.message
-        })
+        next(err)
     }
 }
 
 // Get all images for a specific plan
-async function getPlanImagesController(req, res) {
+async function getPlanImagesController(req, res, next) {
     try {
         let id = req.params.planRoutes;
         let plan = await FoodplanModel.findById(id).select('name images image');
@@ -258,15 +247,12 @@ async function getPlanImagesController(req, res) {
             images: plan.images || []
         });
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            err: err.message
-        });
+        next(err);
     }
 }
 
 // Update video for existing plan
-async function updatePlanVideoController(req, res) {
+async function updatePlanVideoController(req, res, next) {
     try {
         let id = req.params.planRoutes;
         let plan = await FoodplanModel.findById(id);
@@ -283,9 +269,9 @@ async function updatePlanVideoController(req, res) {
             if (fs.existsSync(oldVideoPath)) {
                 try {
                     fs.unlinkSync(oldVideoPath);
-                    console.log(`Deleted old video: ${plan.video}`);
+                    logger.info({ video: plan.video }, "deleted old video");
                 } catch (fileErr) {
-                    console.log(`Error deleting old video:`, fileErr.message);
+                    logger.warn({ err: fileErr }, "delete old video failed");
                 }
             }
         }
@@ -309,15 +295,12 @@ async function updatePlanVideoController(req, res) {
             });
         }
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            err: err.message
-        });
+        next(err);
     }
 }
 
 // Update plan with images and video
-async function updatePlanWithMediaController(req, res) {
+async function updatePlanWithMediaController(req, res, next) {
     try {
         let id = req.params.planRoutes;
         let plan = await FoodplanModel.findById(id);
@@ -343,9 +326,9 @@ async function updatePlanWithMediaController(req, res) {
                     if (fs.existsSync(fullPath)) {
                         try {
                             fs.unlinkSync(fullPath);
-                            console.log(`Deleted old image: ${imagePath}`);
+                            logger.info({ imagePath }, "deleted old image");
                         } catch (fileErr) {
-                            console.log(`Error deleting old image:`, fileErr.message);
+                            logger.warn({ err: fileErr, imagePath }, "delete old image failed");
                         }
                     }
                 });
@@ -369,9 +352,9 @@ async function updatePlanWithMediaController(req, res) {
                 if (fs.existsSync(oldVideoPath)) {
                     try {
                         fs.unlinkSync(oldVideoPath);
-                        console.log(`Deleted old video: ${plan.video}`);
+                        logger.info({ video: plan.video }, "deleted old video");
                     } catch (fileErr) {
-                        console.log(`Error deleting old video:`, fileErr.message);
+                        logger.warn({ err: fileErr }, "delete old video failed");
                     }
                 }
             }
@@ -385,10 +368,7 @@ async function updatePlanWithMediaController(req, res) {
             plan: plan
         });
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            err: err.message
-        });
+        next(err);
     }
 }
 

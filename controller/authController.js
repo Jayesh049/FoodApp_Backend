@@ -1,16 +1,43 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const JWTSECRET = process.env.JWTSECRET || "";
+const config = require("../utilities/config");
+const { JWTSECRET } = config;
+const logger = require("../utilities/logger");
 
 const FooduserModel = require("../model/userModule");
 const mailSender = require("../utilities/mailSender");
 const { sendVerificationEmail } = require("../utilities/mailSender");
 const { getAdminConfig } = require("../utilities/ensureAdminUser");
+const {
+  newCsrfToken,
+  setCsrfCookie,
+  setJwtCookie,
+  clearAuthCookies,
+  tokenVersionMatches,
+} = require("../utilities/sessionCookies");
 
 function isConfiguredAdminEmail(email) {
   const { email: adminEmail } = getAdminConfig();
   if (!adminEmail || !email) return false;
-  return email.toLowerCase().trim() === adminEmail;
+  return user.email.toLowerCase().trim() === adminEmail;
+}
+
+async function issueSession(res, user) {
+  const token = jwt.sign(
+    {
+      data: user["_id"],
+      tv: user.tokenVersion || 0,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
+    },
+    JWTSECRET
+  );
+  const csrfToken = newCsrfToken();
+  setJwtCookie(res, token);
+  setCsrfCookie(res, csrfToken);
+  user.password = undefined;
+  user.confirmPassword = undefined;
+  user.otp = undefined;
+  return csrfToken;
 }
 
 async function signupController(req, res) {
@@ -37,11 +64,10 @@ async function signupController(req, res) {
 
     try {
       await sendVerificationEmail(data.email, verificationToken, data.name);
-      console.log("Verification email sent to:", data.email);
     } catch (emailErr) {
       await FooduserModel.findByIdAndDelete(newUser._id);
-      console.error("Verification email failed:", emailErr);
-      return res.status(500).json({
+      logger.error({ err: emailErr }, "verification email failed");
+      return res.status(503).json({
         result:
           "Could not send verification email. Please check email settings and try again.",
       });
@@ -58,7 +84,7 @@ async function signupController(req, res) {
   }
 }
 
-async function verifyEmailController(req, res) {
+async function verifyEmailController(req, res, next) {
   try {
     const { token } = req.params;
     if (!token) {
@@ -85,11 +111,11 @@ async function verifyEmailController(req, res) {
       result: "Email verified successfully. You can now log in.",
     });
   } catch (err) {
-    res.status(500).json({ result: err.message });
+    next(err);
   }
 }
 
-async function loginController(req, res) {
+async function loginController(req, res, next) {
   try {
     let data = req.body;
     let { email, password } = data;
@@ -119,30 +145,12 @@ async function loginController(req, res) {
           });
         }
 
-        const token = jwt.sign(
-          {
-            data: user["_id"],
-            exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
-          },
-          JWTSECRET
-        );
+        const csrfToken = await issueSession(res, user);
 
-        const isProd = process.env.NODE_ENV === "production";
-        res.cookie("JWT", token, {
-          httpOnly: true,
-          sameSite: isProd ? "strict" : "lax",
-          secure: isProd,
-          maxAge: 24 * 60 * 60 * 1000,
-        });
-
-        user.password = undefined;
-        user.confirmPassword = undefined;
-
-        console.log("login", user.email);
         res.status(200).json({
           result: "ok",
           user,
-          token: `Bearer ${token}`,
+          csrfToken,
         });
       } else {
         res.status(400).json({
@@ -155,13 +163,33 @@ async function loginController(req, res) {
       });
     }
   } catch (err) {
-    res.status(500).json({
-      result: err.message,
-    });
+    next(err);
   }
 }
 
-async function resetPasswordController(req, res) {
+async function demoLoginController(req, res, next) {
+  try {
+    const email = config.optional("DEMO_EMAIL").toLowerCase().trim();
+    const password = config.optional("DEMO_PASSWORD");
+    if (!email || !password) {
+      return res.status(404).json({ result: "Demo login is not configured" });
+    }
+    const user = await FooduserModel.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ result: "Demo user is not seeded" });
+    }
+    const matches = await user.comparePassword(password);
+    if (!matches) {
+      return res.status(403).json({ result: "Demo login failed" });
+    }
+    const csrfToken = await issueSession(res, user);
+    res.status(200).json({ result: "ok", user, csrfToken });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resetPasswordController(req, res, next) {
   try {
     let { otp, password, confirmPassword, email } = req.body;
     let user = await FooduserModel.findOne({ email: email });
@@ -178,7 +206,12 @@ async function resetPasswordController(req, res) {
         result: "Otp expired",
       });
     }
-    if (user.otp != otp) {
+    const submitted = hashOtp(otp);
+    const stored = Buffer.from(String(user.otp || ""), "utf8");
+    const given = Buffer.from(submitted, "utf8");
+    const otpMatches =
+      stored.length === given.length && crypto.timingSafeEqual(stored, given);
+    if (!otpMatches) {
       return res.status(200).json({
         message: "wrong otp",
       });
@@ -188,6 +221,7 @@ async function resetPasswordController(req, res) {
     user.confirmPassword = confirmPassword;
     user.otp = undefined;
     user.otpExpiry = undefined;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
     user.password = undefined;
@@ -197,14 +231,11 @@ async function resetPasswordController(req, res) {
       result: "User password reset",
     });
   } catch (err) {
-    res.status(500).json({
-      result: err.message,
-    });
-    console.log(err);
+    next(err);
   }
 }
 
-async function forgetPasswordController(req, res) {
+async function forgetPasswordController(req, res, next) {
   try {
     let { email } = req.body;
 
@@ -213,7 +244,7 @@ async function forgetPasswordController(req, res) {
       let otp = otpGenerator();
       let afterFiveMin = Date.now() + 5 * 60 * 1000;
       await mailSender(email, otp);
-      user.otp = otp;
+      user.otp = hashOtp(otp);
       user.otpExpiry = afterFiveMin;
       await user.save();
       res.status(204).json({
@@ -225,26 +256,21 @@ async function forgetPasswordController(req, res) {
       });
     }
   } catch (err) {
-    res.status(500).json({ result: err.message });
-    console.log(err.message);
+    next(err);
   }
 }
 
 function otpGenerator() {
-  return Math.floor(100000 + Math.random() * 900000);
+  return String(crypto.randomInt(100000, 1000000));
 }
 
-function protectRoute(req, res, next) {
-  try {
-    const cookieToken = req.cookies && req.cookies.JWT;
-    const authHeader = req.headers && req.headers.authorization;
+function hashOtp(otp) {
+  return crypto.createHash("sha256").update(String(otp)).digest("hex");
+}
 
-    let rawToken = cookieToken;
-    if (!rawToken && authHeader && typeof authHeader === "string") {
-      rawToken = authHeader.startsWith("Bearer ")
-        ? authHeader.slice(7)
-        : authHeader;
-    }
+async function protectRoute(req, res, next) {
+  try {
+    const rawToken = req.cookies && req.cookies.JWT;
 
     if (!rawToken) {
       return res
@@ -259,16 +285,35 @@ function protectRoute(req, res, next) {
       return res.status(401).json({ message: "Invalid token. Kindly login." });
     }
 
+    const user = await FooduserModel.findById(userId).select("tokenVersion");
+    if (!user || !tokenVersionMatches(payload.tv, user.tokenVersion)) {
+      return res.status(401).json({ message: "Session ended. Kindly login." });
+    }
+
     req.userId = userId;
     next();
   } catch (err) {
-    console.log(err);
     if (err.message == "invalid signature") {
       res.status(401).json({ message: "Token invalid kindly login" });
     } else {
       res.status(401).json({ message: err.message });
     }
   }
+}
+
+function issueCsrf(req, res) {
+  const csrfToken = newCsrfToken();
+  setCsrfCookie(res, csrfToken);
+  res.status(200).json({ csrfToken });
+}
+
+async function logoutController(req, res) {
+  await FooduserModel.updateOne(
+    { _id: req.userId },
+    { $inc: { tokenVersion: 1 } }
+  );
+  clearAuthCookies(res);
+  res.status(200).json({ result: "ok" });
 }
 
 async function protectAdminRoute(req, res, next) {
@@ -284,7 +329,7 @@ async function protectAdminRoute(req, res, next) {
     }
     next();
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    return next(err);
   }
 }
 
@@ -296,4 +341,7 @@ module.exports = {
   forgetPasswordController,
   protectRoute,
   protectAdminRoute,
+  issueCsrf,
+  logoutController,
+  demoLoginController,
 };

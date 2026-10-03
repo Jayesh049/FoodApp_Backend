@@ -2,11 +2,15 @@ const FoodBookingModel = require("../model/bookingModel");
 const UserModel = require("../model/userModule");
 const FoodplanModel = require("../model/planModel");
 const Razorpay = require("razorpay");
-const crypto = require("crypto");
-const FoodpaymentModel = require("../model/paymentModel.js");
+const CheckoutOrder = require("../model/checkoutOrderModel");
+const FoodpaymentModel = require("../model/paymentModel");
+const PaymentEvent = require("../model/paymentEventModel");
+const { cartTotalFromPlans, toPaise, chargedLine } = require("../utilities/checkoutPricing");
+const { checkoutDigest, signaturesMatch, webhookDigest } = require("../utilities/paymentSignature");
+const { confirmCheckoutPayment, reconcileStaleCheckouts } = require("../utilities/confirmCheckout");
+const { runMoneyTransaction } = require("../utilities/moneyTransaction");
 
-const KEY_ID = process.env.KEY_ID || "";
-const KEY_SECRET = process.env.KEY_SECRET || "";
+const { KEY_ID, KEY_SECRET, WEBHOOK_SECRET } = require("../utilities/config");
 
 let razorpay = null;
 function getRazorpay() {
@@ -16,12 +20,19 @@ function getRazorpay() {
     throw err;
   }
   if (!razorpay) {
-    razorpay = new Razorpay({
-      key_id: KEY_ID,
-      key_secret: KEY_SECRET,
-    });
+    razorpay = new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
   }
   return razorpay;
+}
+
+function paymentDeps() {
+  return {
+    CheckoutOrder,
+    Payment: FoodpaymentModel,
+    Booking: FoodBookingModel,
+    PaymentEvent,
+    runTransaction: runMoneyTransaction,
+  };
 }
 
 function sameUserId(a, b) {
@@ -36,73 +47,92 @@ async function isAdminUser(userId) {
 async function initiateBooking(req, res, next) {
   try {
     const userId = req.userId;
+    const idempotencyKey = req.get("Idempotency-Key");
+    if (idempotencyKey) {
+      const existing = await CheckoutOrder.findOne({ user: userId, idempotencyKey });
+      if (existing) {
+        return res.status(200).json({
+          id: existing.razorpayOrderId,
+          amount: existing.amountPaise,
+          bookings: existing.bookingIds,
+          reused: true,
+          message: "Existing order returned",
+        });
+      }
+    }
     const cartItems = req.body.cartItems || [req.body];
-    const totalAmount = req.body.price || req.body.priceAtThatTime;
 
     if (!userId) {
       return res.status(401).json({ message: "You are not logged in. Kindly login." });
     }
-
-    if (!cartItems.length) {
+    if (!cartItems.length || !cartItems[0] || !(cartItems[0]._id || cartItems[0].plan)) {
       return res.status(400).json({ message: "Cart is empty" });
     }
 
-    if (totalAmount === undefined || totalAmount === null) {
-      return res.status(400).json({ message: "Price is required" });
-    }
-
-    const bookings = [];
+    const priced = [];
     for (const item of cartItems) {
       const planDetails = await FoodplanModel.findById(item._id || item.plan);
-
       if (!planDetails) {
         return res.status(404).json({
           message: `Plan not found: ${item._id || item.plan}`,
         });
       }
+      const quantity = item.quantity || 1;
+      priced.push({
+        plan: planDetails,
+        quantity,
+        line: chargedLine(planDetails, quantity),
+      });
+    }
 
-      const bookingData = {
+    const totalAmount = cartTotalFromPlans(priced);
+    const bookings = [];
+    for (const row of priced) {
+      const booking = await FoodBookingModel.create({
         bookedAt: new Date(),
-        priceAtThatTime: item.price || planDetails.price,
+        priceAtThatTime: row.line,
         user: userId,
-        plan: item._id || item.plan,
+        plan: row.plan._id,
         status: "pending",
-        quantity: item.quantity || 1,
+        quantity: row.quantity,
         planDetails: {
-          image: planDetails.image,
-          price: planDetails.price,
-          discount: planDetails.discount,
-          reviews: planDetails.reviews,
+          image: row.plan.image,
+          price: row.plan.price,
+          discount: row.plan.discount,
+          reviews: row.plan.reviews,
         },
-      };
-
-      const booking = await FoodBookingModel.create(bookingData);
+      });
       bookings.push(booking);
     }
 
-    let user = await UserModel.findById(userId);
+    const user = await UserModel.findById(userId);
     if (user) {
-      const bookingIds = bookings.map((booking) => booking._id);
-      user.bookings.push(...bookingIds);
+      user.bookings.push(...bookings.map((booking) => booking._id));
       await user.save();
     }
 
-    const amount = Math.round(Number(totalAmount) * 100);
-    const currency = "INR";
-    const options = {
-      amount,
-      currency,
+    const response = await getRazorpay().orders.create({
+      amount: toPaise(totalAmount),
+      currency: "INR",
       receipt: `rs_${bookings[0]._id}`,
-    };
+    });
 
-    const response = await getRazorpay().orders.create(options);
+    await CheckoutOrder.create({
+      razorpayOrderId: response.id,
+      user: userId,
+      bookingIds: bookings.map((booking) => booking._id),
+      amountPaise: toPaise(totalAmount),
+      idempotencyKey: idempotencyKey || undefined,
+      status: "pending",
+      createdAt: new Date(),
+    });
 
     res.status(200).json({
       id: response.id,
       currency: response.currency,
       amount: response.amount,
-      bookings: bookings,
-      totalAmount: totalAmount,
+      bookings,
+      totalAmount,
       message: "Bookings created successfully",
       entity: response.id,
       response,
@@ -112,107 +142,111 @@ async function initiateBooking(req, res, next) {
   }
 }
 
-async function confirmBookingsAfterPayment(bookingIds, orderCreationId, ownerUserId) {
-  if (Array.isArray(bookingIds) && bookingIds.length > 0) {
-    await FoodBookingModel.updateMany(
-      {
-        _id: { $in: bookingIds },
-        user: ownerUserId,
-        status: "pending",
-      },
-      { $set: { status: "confirmed" } }
-    );
-    return;
-  }
-
-  if (!orderCreationId) return;
-
-  try {
-    const order = await getRazorpay().orders.fetch(orderCreationId);
-    const receipt = order && order.receipt;
-    if (!receipt || !receipt.startsWith("rs_")) return;
-
-    const primaryBookingId = receipt.slice(3);
-    const primaryBooking = await FoodBookingModel.findById(primaryBookingId);
-    if (!primaryBooking) return;
-    if (!sameUserId(primaryBooking.user, ownerUserId)) return;
-
-    const bookedAt = primaryBooking.bookedAt || new Date();
-    const windowStart = new Date(bookedAt.getTime() - 60000);
-    const windowEnd = new Date(bookedAt.getTime() + 60000);
-
-    await FoodBookingModel.updateMany(
-      {
-        user: ownerUserId,
-        status: "pending",
-        bookedAt: { $gte: windowStart, $lte: windowEnd },
-      },
-      { $set: { status: "confirmed" } }
-    );
-  } catch (err) {
-    console.log("Could not confirm bookings from order receipt:", err.message);
-  }
-}
-
 async function verifyPayment(req, res, next) {
   try {
-    const userId = req.userId;
-    const secret = KEY_SECRET;
     const {
       orderCreationId,
       razorpayPaymentId,
       razorpayOrderId,
       razorpaySignature,
       bookingIds,
-    } = req.body;
+    } = req.body || {};
 
     if (!orderCreationId || !razorpayPaymentId || !razorpaySignature) {
       return res.status(400).json({ message: "Missing payment fields" });
     }
 
-    const shasum = crypto.createHmac("sha256", secret);
-    shasum.update(`${orderCreationId}|${razorpayPaymentId}`);
-    const digest = shasum.digest("hex");
-
-    if (digest !== razorpaySignature) {
+    const digest = checkoutDigest(KEY_SECRET, orderCreationId, razorpayPaymentId);
+    if (!signaturesMatch(digest, razorpaySignature)) {
+      await PaymentEvent.create({
+        kind: "rejected",
+        razorpayOrderId: razorpayOrderId || orderCreationId,
+        razorpayPaymentId,
+        reason: "bad checkout signature",
+        createdAt: new Date(),
+      });
       return res.status(400).json({ msg: "Transaction not legit!" });
     }
 
-    if (Array.isArray(bookingIds) && bookingIds.length > 0) {
-      const ownedCount = await FoodBookingModel.countDocuments({
-        _id: { $in: bookingIds },
-        user: userId,
-      });
-      if (ownedCount !== bookingIds.length) {
-        return res.status(403).json({
-          message: "One or more bookings do not belong to you",
-        });
-      }
-    } else if (orderCreationId) {
-      const order = await getRazorpay().orders.fetch(orderCreationId);
-      const receipt = order && order.receipt;
-      if (receipt && receipt.startsWith("rs_")) {
-        const primary = await FoodBookingModel.findById(receipt.slice(3));
-        if (!primary || !sameUserId(primary.user, userId)) {
-          return res.status(403).json({ message: "Order does not belong to you" });
-        }
-      }
-    }
-
-    await FoodpaymentModel.create({
+    const result = await confirmCheckoutPayment(paymentDeps(), {
+      razorpayOrderId: razorpayOrderId || orderCreationId,
       razorpayPaymentId,
-      razorpayOrderId,
       razorpaySignature,
       orderCreationId,
+      requestUserId: req.userId,
+      requestedBookingIds: bookingIds,
     });
-
-    await confirmBookingsAfterPayment(bookingIds, orderCreationId, userId);
 
     res.json({
       msg: "success",
-      orderId: razorpayOrderId,
+      duplicate: Boolean(result.duplicate),
+      orderId: result.orderId,
       paymentId: razorpayPaymentId,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function handleRazorpayWebhook(req, res) {
+  try {
+    if (!WEBHOOK_SECRET) {
+      return res.status(503).json({ message: "WEBHOOK_SECRET is not set" });
+    }
+    const raw = req.body;
+    const header = req.get("x-razorpay-signature") || "";
+    const digest = webhookDigest(WEBHOOK_SECRET, raw);
+    if (!signaturesMatch(digest, header)) {
+      await PaymentEvent.create({
+        kind: "rejected",
+        reason: "bad webhook signature",
+        createdAt: new Date(),
+      });
+      return res.status(400).json({ message: "Invalid webhook signature" });
+    }
+
+    const payload = JSON.parse(Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw || "{}"));
+    if (payload.event !== "payment.captured") {
+      return res.status(200).json({ ignored: true });
+    }
+    const payment = payload.payload && payload.payload.payment && payload.payload.payment.entity;
+    if (!payment || !payment.order_id || !payment.id) {
+      return res.status(400).json({ message: "Webhook payment payload missing" });
+    }
+
+    const result = await confirmCheckoutPayment(paymentDeps(), {
+      razorpayOrderId: payment.order_id,
+      razorpayPaymentId: payment.id,
+      razorpaySignature: "webhook",
+      orderCreationId: payment.order_id,
+    });
+    return res.status(200).json({ ok: true, duplicate: Boolean(result.duplicate) });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ message: err.message || "Webhook failed" });
+  }
+}
+
+async function reconcilePayments(req, res, next) {
+  try {
+    const results = await reconcileStaleCheckouts(
+      {
+        ...paymentDeps(),
+        fetchOrder: (id) => getRazorpay().orders.fetch(id),
+        fetchPayments: (id) => getRazorpay().orders.fetchPayments(id),
+      },
+      {}
+    );
+    res.status(200).json({ results });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listPaymentEvents(req, res, next) {
+  try {
+    const events = await PaymentEvent.find().sort({ createdAt: -1 }).limit(100);
+    res.status(200).json({ events });
   } catch (err) {
     next(err);
   }
@@ -225,16 +259,11 @@ async function getBookingById(req, res, next) {
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
-
     const admin = await isAdminUser(req.userId);
     if (!admin && !sameUserId(booking.user, req.userId)) {
       return res.status(403).json({ message: "Not allowed to view this booking" });
     }
-
-    res.status(200).json({
-      result: "booking found",
-      booking,
-    });
+    res.status(200).json({ result: "booking found", booking });
   } catch (err) {
     next(err);
   }
@@ -255,10 +284,7 @@ async function deleteAllBookings(req, res, next) {
   try {
     await FoodBookingModel.deleteMany({});
     await UserModel.updateMany({}, { $set: { bookings: [] } });
-
-    res.status(200).json({
-      message: "All bookings deleted successfully",
-    });
+    res.status(200).json({ message: "All bookings deleted successfully" });
   } catch (err) {
     next(err);
   }
@@ -267,7 +293,11 @@ async function deleteAllBookings(req, res, next) {
 module.exports = {
   initiateBooking,
   verifyPayment,
+  handleRazorpayWebhook,
+  reconcilePayments,
+  listPaymentEvents,
   getBookings,
   getBookingById,
   deleteAllBookings,
+  paymentDeps,
 };

@@ -1,8 +1,6 @@
 const nodemailer = require("nodemailer");
 
-const APP_EMAIL = process.env.APP_EMAIL || "";
-const APP_PASSWORD = process.env.APP_PASSWORD || "";
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3001";
+const { APP_EMAIL, APP_PASSWORD, FRONTEND_URL } = require("./config");
 
 function createGmailTransporter() {
   if (!APP_EMAIL || !APP_PASSWORD) {

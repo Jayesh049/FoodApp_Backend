@@ -10,7 +10,8 @@ const {
     getUserPurchasedPlansController,
     canUserReviewController
 } = require('../controller/reviewController');
-const { protectRoute } = require('../controller/authController');
+const { protectRoute, protectAdminRoute } = require('../controller/authController');
+const { validateObjectId } = require('../middleware/validateObjectId');
 
 // Public routes
 reviewRoutes.get("/best3", getTop3Reviews);
@@ -22,13 +23,10 @@ reviewRoutes.use(protectRoute); // Apply auth middleware to all routes below
 // Create review for a plan (requires authentication)
 reviewRoutes.post("/plan/:plan", createReviewController);
 
-reviewRoutes.route("/")
-    .get(getAllReviewController)
-    .patch(updateReview)
-    .delete(deleteReview);
-
-// User-specific routes
+reviewRoutes.get("/", getAllReviewController);
 reviewRoutes.get("/my-purchases", getUserPurchasedPlansController);
 reviewRoutes.get("/can-review/:plan", canUserReviewController);
+reviewRoutes.patch("/:id", validateObjectId("id"), updateReview);
+reviewRoutes.delete("/:id", protectAdminRoute, validateObjectId("id"), deleteReview);
 
 module.exports = reviewRoutes;

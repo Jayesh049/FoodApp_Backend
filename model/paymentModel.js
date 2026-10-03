@@ -9,6 +9,7 @@ const paymentSchema = new mongoose.Schema({
   razorpayPaymentId: {
     type: String,
     required: true,
+    unique: true,
   },
   razorpaySignature: {
     type: String,

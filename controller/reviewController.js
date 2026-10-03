@@ -5,7 +5,7 @@ const { moderateReviewText } = require("../utilities/reviewModeration");
 
 const PURCHASED_BOOKING_STATUSES = ["confirmed", "preparing", "out_for_delivery", "delivered"];
 
-async function createReviewController(req,res){
+async function createReviewController(req, res, next){
   try{
     const planId = req.params.plan;
     
@@ -103,14 +103,11 @@ async function createReviewController(req,res){
     });
   }
   catch(err){
-    console.log("Review creation error:", err);
-    return res.status(500).json({
-      message: err.message,
-    });
+    return next(err);
   }
 }
   
-   async function getAllReviewController(req, res){
+   async function getAllReviewController(req, res, next){
     try{
         let reviews = await reviewModel.find()
         .populate({path :"user" , select : "name pic"})
@@ -121,12 +118,11 @@ async function createReviewController(req,res){
           result: "all results send"
         })
     }catch(err){
-        console.log(err);
-        res.status(500).json({message : err.message});
+        next(err);
     }
   }
 
-  async function getTop3Reviews(req, res) {
+  async function getTop3Reviews(req, res, next) {
     try {
         let reviews = await reviewModel.find()
             .populate({ path: "user", select: "name pic " })
@@ -136,56 +132,43 @@ async function createReviewController(req,res){
             result: "all results send"
         })
     } catch (err) {
-        console.log(err)
-        res.status(500).json({ message: err.message });
+        next(err);
     }
 }
   
-async function updateReview(req,res){
-  try{
-  let planid=req.params.plan;
-  let id=req.body.id;
-  let dataToBeUpdated=req.body;
-  let keys=[];
-  for(let key in dataToBeUpdated){
-    if(key==id) continue;
-    keys.push(key);
-  }
-  let review=await reviewModel.findById(id);
-  for(let i=0;i<keys.length;i++){
-    review[keys[i]]=dataToBeUpdated[keys[i]];
-  }
-  await review.save();
-  return res.json({
-    message:'plan updated succesfully',
-    data:review
-});
-  }
-  catch(err){
-    return res.json({
-      message:err.message
-  });
+async function updateReview(req, res, next) {
+  try {
+    const review = await reviewModel.findById(req.params.id);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+    const ownerId = review.user && review.user.toString();
+    const actor = await require("../model/userModule").findById(req.userId).select("role");
+    const isAdmin = actor && actor.role === "admin";
+    if (ownerId !== String(req.userId) && !isAdmin) {
+      return res.status(403).json({ message: "You cannot edit this review" });
+    }
+    if (req.body.rating !== undefined) review.rating = req.body.rating;
+    if (req.body.description !== undefined) review.description = req.body.description;
+    await review.save();
+    return res.json({ message: "review updated", data: review });
+  } catch (err) {
+    return next(err);
   }
 }
 
-async function deleteReview(req,res){
-  try{
-  let reviews =await reviewModel.find();
-  console.log("reviewId",reviews);
-  let review=await reviewModel.findByIdAndDelete(reviews);
-  res.json({
-    message: "review deleted",
-    data: review,
-  });
-} 
-catch (err) {
-  return res.json({
-    message: err.message,
-  });
-}
+async function deleteReview(req, res, next) {
+  try {
+    const review = await reviewModel.findByIdAndDelete(req.params.id);
+    if (!review) return res.status(404).json({ message: "Review not found" });
+    await planModel.updateOne({ _id: review.plan }, { $pull: { reviews: review._id } });
+    res.json({ message: "review deleted" });
+  } catch (err) {
+    next(err);
+  }
 }
 // Get reviews for a specific plan
-async function getPlanReviewsController(req, res) {
+async function getPlanReviewsController(req, res, next) {
   try {
     const planId = req.params.plan;
     
@@ -199,13 +182,12 @@ async function getPlanReviewsController(req, res) {
       reviews: reviews
     });
   } catch (err) {
-    console.log("Get plan reviews error:", err);
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 }
 
 // Get user's purchased plans (for review page)
-async function getUserPurchasedPlansController(req, res) {
+async function getUserPurchasedPlansController(req, res, next) {
   try {
     const userId = req.userId; // From auth middleware
     
@@ -240,13 +222,12 @@ async function getUserPurchasedPlansController(req, res) {
       plans: uniquePlans
     });
   } catch (err) {
-    console.log("Get user purchased plans error:", err);
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 }
 
 // Check if user can review a plan
-async function canUserReviewController(req, res) {
+async function canUserReviewController(req, res, next) {
   try {
     const userId = req.userId;
     const planId = req.params.plan;
@@ -273,8 +254,7 @@ async function canUserReviewController(req, res) {
         "You need to purchase this plan to review it"
     });
   } catch (err) {
-    console.log("Can user review error:", err);
-    res.status(500).json({ message: err.message });
+    next(err);
   }
 }
 

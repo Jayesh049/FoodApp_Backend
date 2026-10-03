@@ -1,12 +1,22 @@
 # FoodApp Backend
 
-**REST API for a meal-plan delivery product** — auth, plans, bookings, Razorpay payments, reviews, and optional AI suggestions.
+[![CI](https://github.com/Jayesh049/FoodApp_Backend/actions/workflows/ci.yml/badge.svg)](https://github.com/Jayesh049/FoodApp_Backend/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+API for vegetarian meal plans, with server-priced checkout. [Live app](https://foodapp-frontend-z1zg.onrender.com) · [API health](https://foodapp-backend-joksepha.onrender.com/health) · [Built vs template](docs/BUILT_VS_TEMPLATE.md)
+
+![FoodApp homepage: plated vegetarian kitchen](screenshots/live-home.png)
+
+`POST /api/v1/booking/` drops any client total and recomputes from the stored plan. Confirm checks the Razorpay signature and the booking owner, and the same payment id is a no-op the second time. The JWT stays in an httpOnly cookie.
+
+![Paneer Tikka plan on the live homepage, Rs 283 per month](screenshots/live-plan.png)
 
 | | |
 |---|---|
 | **Frontend (UI)** | [FoodApp_Frontend](https://github.com/Jayesh049/FoodApp_Frontend) |
 | **This repo (API)** | [FoodApp_Backend](https://github.com/Jayesh049/FoodApp_Backend) |
 | **Architecture (developers)** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| **OpenAPI** | Local: [http://localhost:3000/api/docs](http://localhost:3000/api/docs) · JSON: `/api/docs.json` |
 
 ---
 
@@ -33,7 +43,17 @@ You do **not** need to be an engineer to skim this README. Developers should ope
 
 ---
 
-## What this API does
+## Engineering decisions
+
+- **Server-side pricing** — amounts come from the stored plan; the client cannot set the charged total.
+- **httpOnly cookie + CSRF** — JWT is not in `localStorage`; mutating requests need the CSRF header; logout bumps `tokenVersion`.
+- **Webhook + reconcile** — raw-body Razorpay webhook signature check; admin reconcile for abandoned pending orders.
+- **Idempotent confirm** — duplicate payment id is a no-op; booking create accepts `Idempotency-Key`.
+- **RAG fallback** — name search when Ollama or the vector index is down.
+
+Optional Stripe Checkout sits beside Razorpay when `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are set (env only).
+
+Scope note: [docs/BUILT_VS_TEMPLATE.md](docs/BUILT_VS_TEMPLATE.md). GitHub sidebar fields: [docs/GITHUB_PRESENTATION.md](docs/GITHUB_PRESENTATION.md).
 
 - **Auth** — signup, login, email verify, forgot/reset password (JWT cookies)
 - **Users** — profile; admin-gated user listing
@@ -114,4 +134,4 @@ Point `FRONTEND_URL` at that app’s origin when running locally or in productio
 
 ## License
 
-ISC (see `package.json`).
+[MIT](LICENSE).

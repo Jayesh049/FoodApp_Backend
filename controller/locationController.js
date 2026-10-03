@@ -1,8 +1,9 @@
+const logger = require("../utilities/logger");
 const axios = require('axios');
 const FooduserModel = require("../model/userModule");
 
 // Update user location with coordinates
-async function updateLocationController(req, res) {
+async function updateLocationController(req, res, next) {
     try {
         const userId = req.userId;
         const { latitude, longitude } = req.body;
@@ -49,15 +50,12 @@ async function updateLocationController(req, res) {
         });
 
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            result: err.message
-        });
+        next(err);
     }
 }
 
 // Get user's current location
-async function getLocationController(req, res) {
+async function getLocationController(req, res, next) {
     try {
         const userId = req.userId;
         const user = await FooduserModel.findById(userId);
@@ -81,15 +79,12 @@ async function getLocationController(req, res) {
         });
 
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            result: err.message
-        });
+        next(err);
     }
 }
 
 // Get location by IP (fallback method)
-async function getLocationByIPController(req, res) {
+async function getLocationByIPController(req, res, next) {
     try {
         const clientIP = req.ip || req.connection.remoteAddress;
         
@@ -114,15 +109,12 @@ async function getLocationByIPController(req, res) {
         });
 
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            result: err.message
-        });
+        next(err);
     }
 }
 
 // Geocode coordinates to address using OpenStreetMap
-async function geocodeLocationController(req, res) {
+async function geocodeLocationController(req, res, next) {
     try {
         const { latitude, longitude } = req.body;
 
@@ -140,10 +132,7 @@ async function geocodeLocationController(req, res) {
         });
 
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            result: err.message
-        });
+        next(err);
     }
 }
 
@@ -172,7 +161,7 @@ async function geocodeCoordinates(latitude, longitude) {
         };
 
     } catch (error) {
-        console.log('Geocoding error:', error.message);
+        logger.warn({ err: error }, "geocoding failed");
         return {
             address: 'Address not found',
             city: '',
@@ -184,7 +173,7 @@ async function geocodeCoordinates(latitude, longitude) {
 }
 
 // Smart location detection - Auto-fetch or manual selection
-async function smartLocationController(req, res) {
+async function smartLocationController(req, res, next) {
     try {
         const { latitude, longitude, accuracy } = req.body;
         const userId = req.userId;
@@ -245,15 +234,12 @@ async function smartLocationController(req, res) {
         }
 
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            result: err.message
-        });
+        next(err);
     }
 }
 
 // Search locations by address (for manual map selection)
-async function searchLocationController(req, res) {
+async function searchLocationController(req, res, next) {
     try {
         const { query } = req.body;
 
@@ -292,15 +278,12 @@ async function searchLocationController(req, res) {
         });
 
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            result: err.message
-        });
+        next(err);
     }
 }
 
 // Find nearby users (for delivery radius)
-async function findNearbyUsersController(req, res) {
+async function findNearbyUsersController(req, res, next) {
     try {
         const { latitude, longitude, radius = 10 } = req.body; // radius in km
 
@@ -320,7 +303,7 @@ async function findNearbyUsersController(req, res) {
                 $gte: longitude - (radius / (111 * Math.cos(latitude * Math.PI / 180))),
                 $lte: longitude + (radius / (111 * Math.cos(latitude * Math.PI / 180)))
             }
-        }).select('name email location');
+        }).select("name location");
 
         res.status(200).json({
             result: "Nearby users found",
@@ -329,10 +312,7 @@ async function findNearbyUsersController(req, res) {
         });
 
     } catch (err) {
-        console.log(err);
-        res.status(500).json({
-            result: err.message
-        });
+        next(err);
     }
 }
 

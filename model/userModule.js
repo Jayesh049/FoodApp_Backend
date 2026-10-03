@@ -1,14 +1,9 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
-const DB_LINK = process.env.DB_LINK;
+const { DB_LINK } = require("../utilities/config");
 
-if (!DB_LINK) {
-  console.error(
-    "[config] DB_LINK is not set. Add it in the host Environment (Render → Environment). Do not upload secrets.js."
-  );
-} else {
-  mongoose
+mongoose
   .connect(DB_LINK, {
     serverSelectionTimeoutMS: 20000,
     family: 4,
@@ -24,7 +19,6 @@ if (!DB_LINK) {
       );
     }
   });
-}
 
 let userSchema = new mongoose.Schema({
   name: {
@@ -124,6 +118,10 @@ let userSchema = new mongoose.Schema({
     type: String,
     enum: ["user", "admin"],
     default: "user",
+  },
+  tokenVersion: {
+    type: Number,
+    default: 0,
   },
 });
 

@@ -1,9 +1,11 @@
 const FooduserModel = require("../model/userModule");
+const config = require("./config");
+const logger = require("./logger");
 
 function getAdminConfig() {
   return {
-    email: (process.env.ADMIN_EMAIL || "").toLowerCase().trim(),
-    password: process.env.ADMIN_PASSWORD || "",
+    email: config.optional("ADMIN_EMAIL").toLowerCase().trim(),
+    password: config.optional("ADMIN_PASSWORD"),
     name: process.env.ADMIN_NAME || "FoodApp Admin",
   };
 }
@@ -15,7 +17,7 @@ function isBcryptHash(value) {
 async function ensureAdminUser() {
   const { email, password, name } = getAdminConfig();
   if (!email || !password) {
-    console.warn("[admin] ADMIN_EMAIL or ADMIN_PASSWORD not set — skipping admin seed");
+    logger.warn("ADMIN_EMAIL or ADMIN_PASSWORD not set, skipping admin seed");
     return;
   }
 
@@ -29,7 +31,7 @@ async function ensureAdminUser() {
       role: "admin",
       isEmailVerified: true,
     });
-    console.log("[admin] Created admin user:", email);
+    logger.info("created admin user");
   } else {
     user.name = name;
     user.role = "admin";
@@ -42,7 +44,7 @@ async function ensureAdminUser() {
       user.confirmPassword = password;
     }
     await user.save();
-    console.log("[admin] Ensured admin user:", email);
+    logger.info("ensured admin user");
   }
 
   const demoted = await FooduserModel.updateMany(
@@ -50,8 +52,34 @@ async function ensureAdminUser() {
     { $set: { role: "user" } }
   );
   if (demoted.modifiedCount > 0) {
-    console.log("[admin] Removed admin role from", demoted.modifiedCount, "other user(s)");
+    logger.info({ count: demoted.modifiedCount }, "removed extra admin roles");
   }
 }
 
-module.exports = { ensureAdminUser, getAdminConfig };
+module.exports = { ensureAdminUser, ensureDemoUser, getAdminConfig };
+
+async function ensureDemoUser() {
+  const email = config.optional("DEMO_EMAIL").toLowerCase().trim();
+  const password = config.optional("DEMO_PASSWORD");
+  const name = process.env.DEMO_NAME || "FoodApp Demo";
+  if (!email || !password) return;
+  let user = await FooduserModel.findOne({ email });
+  if (!user) {
+    await FooduserModel.create({
+      name,
+      email,
+      password,
+      confirmPassword: password,
+      role: "user",
+      isEmailVerified: true,
+    });
+    return;
+  }
+  user.isEmailVerified = true;
+  user.role = user.role === "admin" ? "admin" : "user";
+  if (!isBcryptHash(user.password)) {
+    user.password = password;
+    user.confirmPassword = password;
+  }
+  await user.save();
+}

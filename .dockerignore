@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log*
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+uploads/*
+!uploads/.gitkeep
+uploads/user-plans
+uploads/dishes
+tests
+coverage
+*.md
+scripts/_*.js
+scripts/_*.ps1

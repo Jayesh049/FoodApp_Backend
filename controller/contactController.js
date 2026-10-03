@@ -1,6 +1,6 @@
 const { sendContactEmail } = require("../utilities/mailSender");
 
-async function sendContactController(req, res) {
+async function sendContactController(req, res, next) {
   try {
     const { name, email, source, message } = req.body;
 
@@ -28,10 +28,7 @@ async function sendContactController(req, res) {
       result: "Message sent successfully! We will get back to you soon.",
     });
   } catch (err) {
-    console.error("Contact form email failed:", err);
-    res.status(500).json({
-      result: "Could not send your message. Please try again later.",
-    });
+    next(err);
   }
 }
 

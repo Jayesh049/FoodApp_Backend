@@ -26,7 +26,22 @@ function listUploadImages() {
     .map((f) => `uploads/${f}`);
 }
 
-async function waitForDb(maxAttempts = 5) {
+/** Tiny PNG so docker compose seed works without shipping real dish photos. */
+function ensureSeedImages() {
+  const existing = listUploadImages();
+  if (existing.length) return existing;
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  const dest = path.join(UPLOADS_DIR, "seed-placeholder.png");
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64"
+  );
+  fs.writeFileSync(dest, png);
+  console.log("Created uploads/seed-placeholder.png for docker/local seed.");
+  return ["uploads/seed-placeholder.png"];
+}
+
+async function waitForDb(maxAttempts = 20) {
   if (mongoose.connection.readyState === 1) return;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -79,10 +94,7 @@ async function waitForDb(maxAttempts = 5) {
 }
 
 async function insertPlans(targetCount) {
-  const images = listUploadImages();
-  if (!images.length) {
-    throw new Error("No images in uploads/. Add at least one PNG/JPG first.");
-  }
+  const images = ensureSeedImages();
 
   const existing = await FoodplanModel.countDocuments();
   console.log(`Existing plans in DB: ${existing}`);
